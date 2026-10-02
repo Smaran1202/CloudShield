@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     database_url: str = "sqlite:///cloudshield.db"
+    aws_region: str | None = None
     gemini_api_key: str | None = None
     gemini_model: str | None = None
     gemini_fallback_model: str | None = None

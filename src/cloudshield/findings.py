@@ -1,5 +1,10 @@
 import hashlib
 from dataclasses import dataclass
+from typing import Literal, get_args
+
+Severity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
+FindingStatus = Literal["OPEN", "RESOLVED"]
+SEVERITIES = get_args(Severity)
 
 
 @dataclass(frozen=True)
@@ -9,9 +14,9 @@ class Finding:
     resource_id: str
     resource_type: str
     title: str
-    severity: str  # CRITICAL, HIGH, MEDIUM, LOW or INFO
+    severity: Severity
     category: str
-    status: str  # OPEN or RESOLVED
+    status: FindingStatus
     details: dict
 
 

@@ -1,6 +1,4 @@
-import re
-
-from cloudshield.rules.iam import as_list, statements
+from cloudshield.rules.iam import as_list, matches, statements
 from cloudshield.rules.rule import Hit, Rule, of_type
 
 # Method names and permissions from the Rhino Security Labs catalogue
@@ -34,11 +32,6 @@ METHODS = [
         ["iam:UpdateAssumeRolePolicy", "sts:AssumeRole"],
     ),
 ]
-
-
-def matches(pattern: str, action: str) -> bool:
-    regex = re.escape(pattern.lower()).replace(r"\*", ".*").replace(r"\?", ".")
-    return re.fullmatch(regex, action.lower()) is not None
 
 
 def policy_documents(entity: dict) -> list[dict] | None:

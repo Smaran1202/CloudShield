@@ -30,11 +30,32 @@ The web app reads `VITE_API_URL` (see `web/.env.example`). It defaults to `http:
 
 ## Run
 
-In one terminal, start the API:
+Create or update the database (SQLite by default, in `cloudshield.db`). Run this once, and again
+after pulling changes that add migrations:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
-uvicorn cloudshield.api.app:create_app --factory --port 8000
+python -m alembic upgrade head
+```
+
+To use PostgreSQL, set `DATABASE_URL` and install a driver such as `psycopg` first.
+
+In one terminal, start the API. A scan uses the AWS profile named in `AWS_PROFILE` and the region
+in `AWS_REGION`, or the regions sent with the scan request:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+$env:AWS_PROFILE = "your-profile"
+$env:AWS_REGION = "us-east-1"
+python -m uvicorn cloudshield.api.app:create_app --factory --port 8000
+```
+
+Start a scan and read the results:
+
+```powershell
+$scan = Invoke-RestMethod -Method Post http://localhost:8000/api/scans
+Invoke-RestMethod http://localhost:8000/api/scans/$($scan.id)
+Invoke-RestMethod http://localhost:8000/api/findings
 ```
 
 In a second terminal, start the web app:

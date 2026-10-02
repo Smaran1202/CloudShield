@@ -4,6 +4,7 @@ from cloudshield.config import Settings
 def test_defaults_when_environment_is_empty(monkeypatch):
     for name in [
         "DATABASE_URL",
+        "AWS_REGION",
         "GEMINI_API_KEY",
         "GEMINI_MODEL",
         "GEMINI_FALLBACK_MODEL",
@@ -16,6 +17,7 @@ def test_defaults_when_environment_is_empty(monkeypatch):
 
     assert settings.database_url == "sqlite:///cloudshield.db"
     assert settings.frontend_origin == "http://localhost:5173"
+    assert settings.aws_region is None
     assert settings.gemini_api_key is None
     assert settings.gemini_model is None
     assert settings.gemini_fallback_model is None

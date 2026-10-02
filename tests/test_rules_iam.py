@@ -35,7 +35,7 @@ def test_resource_star_with_a_write_action_is_a_medium_finding():
 
 
 def test_resource_star_with_only_read_only_actions_is_not_a_finding():
-    actions = ["s3:GetObject", "s3:List*", "ec2:Describe*", "iam:GetPolicy"]
+    actions = ["s3:GetBucketLocation", "s3:List*", "ec2:Describe*", "iam:GetPolicy"]
 
     assert check_wildcard_policies([policy(document(allow(actions, "*")))]) == []
 
@@ -47,11 +47,46 @@ def test_resource_star_with_an_allowlisted_read_action_is_not_a_finding():
 
 
 def test_resource_star_lists_only_the_non_read_only_actions():
-    actions = ["s3:GetObject", "s3:DeleteObject", "ec2:Describe*"]
+    actions = ["s3:GetBucketLocation", "s3:DeleteObject", "ec2:Describe*"]
 
     hits = check_wildcard_policies([policy(document(allow(actions, "*")))])
 
     assert hits[0].details["statements"][0]["non_read_only_actions"] == ["s3:DeleteObject"]
+
+
+def test_sensitive_get_actions_on_all_resources_are_a_medium_finding():
+    sensitive = [
+        "secretsmanager:GetSecretValue",
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "ssm:GetParametersByPath",
+        "ec2:GetPasswordData",
+        "s3:GetObject",
+    ]
+
+    for action in sensitive:
+        hits = check_wildcard_policies([policy(document(allow(action, "*")))])
+
+        assert len(hits) == 1, action
+        assert hits[0].severity == "MEDIUM", action
+        assert hits[0].details["statements"][0]["non_read_only_actions"] == [action]
+
+
+def test_get_wildcard_that_includes_a_sensitive_action_is_a_finding():
+    for action in ["s3:Get*", "ssm:Get*", "ec2:Get*", "secretsmanager:GetSecret*"]:
+        hits = check_wildcard_policies([policy(document(allow(action, "*")))])
+
+        assert len(hits) == 1, action
+
+
+def test_get_wildcard_with_no_sensitive_action_is_still_read_only():
+    assert check_wildcard_policies([policy(document(allow("iam:Get*", "*")))]) == []
+
+
+def test_sensitive_get_action_limited_to_one_resource_is_not_a_finding():
+    statement = allow("s3:GetObject", "arn:aws:s3:::one-bucket/*")
+
+    assert check_wildcard_policies([policy(document(statement))]) == []
 
 
 def test_service_wildcard_action_on_all_resources_counts_as_not_read_only():

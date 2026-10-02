@@ -23,9 +23,11 @@
   MEDIUM and is flagged only when an allowed action is not read-only. Read-only means the action
   starts with Get, List or Describe, or is one of a short allowlist (`dynamodb:Query`,
   `dynamodb:Scan`, `dynamodb:BatchGetItem`, `logs:FilterLogEvents`, `cloudtrail:LookupEvents`).
-  Some Get actions can still expose sensitive data, for example `secretsmanager:GetSecretValue`
-  or `s3:GetObject` on every bucket, and are not flagged. Statements that use `NotAction` or
-  `NotResource` are skipped.
+  These Get actions are never read-only: `secretsmanager:GetSecretValue`, `ssm:GetParameter`,
+  `ssm:GetParameters`, `ssm:GetParametersByPath`, `ec2:GetPasswordData` and `s3:GetObject`.
+  A wildcard that includes one of them, such as `s3:Get*`, counts too. The list is short, so
+  other Get actions that return sensitive data (for example `s3:GetObjectVersion`) are still
+  treated as read-only. Statements that use `NotAction` or `NotResource` are skipped.
 - SX-IAM-PRIVESC-001 gives one finding per policy or role, listing every matched method. It
   checks the 15 methods in its list from the Rhino Security Labs catalogue. The catalogue has 21
   methods; the rest (for example Glue, CloudFormation and Data Pipeline) are not checked. It does
@@ -33,3 +35,20 @@
   unconditional Deny on all resources cancels a grant. A role is skipped when any of its policies
   could not be read. A policy with Action "*" is also reported by CIS-IAM-001, and its privesc
   finding says that a full wildcard implies all methods.
+
+## Scans and stored results
+
+- A finding is marked RESOLVED only when the scanner service for its resource type (`s3`, `ec2` or
+  `iam`) returned no errors in that scan. One error anywhere in a service, in any region, stops
+  all findings of that service from being resolved in that scan, even for resources that were
+  scanned fine.
+- Findings on EC2 instances and security groups are resolved only if the resource's region was
+  part of the scan.
+- A finding on an IAM role is never resolved as "resource not found", because roles are only
+  found through instances. It can be resolved as "no longer detected" while the role is still
+  returned by the scan.
+- Resources that disappear are not deleted from the resources table; it keeps the latest known
+  state, and `last_seen_scan_id` shows when it was last seen.
+- Only one scan can run at a time. This is enforced inside one server process, so run a single
+  API process. A scan left unfinished by a crash is marked failed when the server starts again.
+- There are no accounts or logins yet; every row has `account_id` "local".

@@ -13,6 +13,8 @@ dependencies = [
     "uvicorn",
     "pydantic-settings",
     "boto3",
+    "sqlalchemy",
+    "alembic",
 ]
 
 [project.optional-dependencies]

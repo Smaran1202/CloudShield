@@ -1,3 +1,5 @@
+import re
+
 from cloudshield.rules.rule import Hit, Rule, of_type
 
 READ_ONLY_PREFIXES = ("get", "list", "describe")
@@ -9,6 +11,15 @@ READ_ONLY_ALLOWLIST = {
     "logs:filterlogevents",
     "cloudtrail:lookupevents",
 }
+# Start with Get but return secrets or data, so they are never treated as read-only.
+SENSITIVE_READS = (
+    "secretsmanager:GetSecretValue",
+    "ssm:GetParameter",
+    "ssm:GetParameters",
+    "ssm:GetParametersByPath",
+    "ec2:GetPasswordData",
+    "s3:GetObject",
+)
 
 
 def as_list(value) -> list:
@@ -21,7 +32,14 @@ def statements(document: dict) -> list[dict]:
     return as_list(document.get("Statement"))
 
 
+def matches(pattern: str, action: str) -> bool:
+    regex = re.escape(pattern.lower()).replace(r"\*", ".*").replace(r"\?", ".")
+    return re.fullmatch(regex, action.lower()) is not None
+
+
 def is_read_only(action: str) -> bool:
+    if any(matches(action, sensitive) for sensitive in SENSITIVE_READS):
+        return False
     name = action.split(":")[-1].lower()
     return name.startswith(READ_ONLY_PREFIXES) or action.lower() in READ_ONLY_ALLOWLIST
 
@@ -68,7 +86,10 @@ RULES = [
             'A customer-managed policy has an Allow statement with Action "*" (HIGH), or with '
             'Resource "*" and at least one action that is not read-only (MEDIUM). Read-only '
             "means the action starts with Get, List or Describe, or is in a short allowlist "
-            "in the rule code. A policy whose actions are all read-only is not flagged for "
+            "in the rule code, except that secretsmanager:GetSecretValue, ssm:GetParameter, "
+            "ssm:GetParameters, ssm:GetParametersByPath, ec2:GetPasswordData and s3:GetObject "
+            "are never read-only, and neither is a wildcard that includes one of them. A policy "
+            "whose actions are all read-only is not flagged for "
             'Resource "*". Statements that use NotAction or NotResource are skipped, because '
             "they cannot be judged by looking for a single wildcard."
         ),

@@ -38,10 +38,12 @@ def scan_like_resources() -> list[dict]:
         "Version": "2012-10-17",
         "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}],
     }
-    read_only_document = {
-        "Version": "2012-10-17",
-        "Statement": [{"Effect": "Allow", "Action": ["s3:Get*", "s3:List*"], "Resource": "*"}],
+    read_only_statement = {
+        "Effect": "Allow",
+        "Action": ["ec2:Describe*", "iam:Get*"],
+        "Resource": "*",
     }
+    read_only_document = {"Version": "2012-10-17", "Statement": [read_only_statement]}
     return [
         bucket("default-bucket", ALL_ON, "Disabled"),
         bucket("open-bucket", ALL_OFF, "Disabled"),
