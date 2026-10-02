@@ -1,4 +1,5 @@
 import threading
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
@@ -26,7 +27,9 @@ def get_session(request: Request):
 
 @router.post("/scans", status_code=202, response_model=ScanOut)
 def start_scan(
-    request: Request, body: ScanRequest | None = None, session: Session = Depends(get_session)
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    body: ScanRequest | None = None,
 ) -> ScanRow:
     state = request.app.state
     regions = body.regions if body and body.regions else None
@@ -49,13 +52,13 @@ def start_scan(
 
 
 @router.get("/scans", response_model=list[ScanOut])
-def list_scans(session: Session = Depends(get_session)) -> list[ScanRow]:
+def list_scans(session: Annotated[Session, Depends(get_session)]) -> list[ScanRow]:
     query = select(ScanRow).where(ScanRow.account_id == ACCOUNT_ID).order_by(ScanRow.id.desc())
     return list(session.scalars(query))
 
 
 @router.get("/scans/{scan_id}", response_model=ScanOut)
-def get_scan(scan_id: int, session: Session = Depends(get_session)) -> ScanRow:
+def get_scan(scan_id: int, session: Annotated[Session, Depends(get_session)]) -> ScanRow:
     scan = session.get(ScanRow, scan_id)
     if scan is None or scan.account_id != ACCOUNT_ID:
         raise HTTPException(status_code=404, detail="Scan not found.")
@@ -64,7 +67,7 @@ def get_scan(scan_id: int, session: Session = Depends(get_session)) -> ScanRow:
 
 @router.get("/resources", response_model=list[ResourceOut])
 def list_resources(
-    resource_type: str | None = None, session: Session = Depends(get_session)
+    session: Annotated[Session, Depends(get_session)], resource_type: str | None = None
 ) -> list[ResourceRow]:
     query = select(ResourceRow).where(ResourceRow.account_id == ACCOUNT_ID)
     if resource_type:
@@ -74,11 +77,11 @@ def list_resources(
 
 @router.get("/findings", response_model=list[FindingOut])
 def list_findings(
+    session: Annotated[Session, Depends(get_session)],
     severity: Severity | None = None,
     status: FindingStatus | None = None,
     rule_id: str | None = None,
     resource_type: str | None = None,
-    session: Session = Depends(get_session),
 ) -> list[FindingRow]:
     query = select(FindingRow).where(FindingRow.account_id == ACCOUNT_ID)
     filters = {
@@ -95,7 +98,9 @@ def list_findings(
 
 
 @router.get("/findings/{finding_id}", response_model=FindingDetailOut)
-def get_finding(finding_id: str, session: Session = Depends(get_session)) -> FindingDetailOut:
+def get_finding(
+    finding_id: str, session: Annotated[Session, Depends(get_session)]
+) -> FindingDetailOut:
     row = session.get(FindingRow, (ACCOUNT_ID, finding_id))
     if row is None:
         raise HTTPException(status_code=404, detail="Finding not found.")
