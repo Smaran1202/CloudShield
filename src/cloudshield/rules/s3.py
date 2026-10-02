@@ -85,8 +85,7 @@ RULES = [
         severity="MEDIUM",
         category="Storage",
         description=(
-            "Versioning is off or suspended, so overwritten or deleted objects cannot be "
-            "recovered."
+            "Versioning is off or suspended, so overwritten or deleted objects cannot be recovered."
         ),
         fix="Enable versioning on the bucket.",
         check=check_versioning,
