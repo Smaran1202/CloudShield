@@ -10,3 +10,4 @@ dist/
 .embeddings_cache/
 CLAUDE.md
 .claude/
+scan-output*.json

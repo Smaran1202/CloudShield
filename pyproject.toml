@@ -12,6 +12,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "pydantic-settings",
+    "boto3",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +20,7 @@ dev = [
     "pytest",
     "ruff",
     "httpx",
+    "moto[ec2,iam,s3]",
 ]
 
 [tool.setuptools.packages.find]
