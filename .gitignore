@@ -1,0 +1,12 @@
+.env
+*.db
+.venv/
+node_modules/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+.embeddings_cache/
+CLAUDE.md
+.claude/
