@@ -15,8 +15,21 @@ def collect_policies(session, errors: list) -> list[dict]:
         document = fetch_document(iam, arn, policy["DefaultVersionId"], errors)
         if document is not None:
             attributes["document"] = document
+        where = {"service": "iam", "region": None, "resource": arn}
+        attached_to, ok = attempt(errors, where, list_entities, iam, arn)
+        if ok:
+            attributes["attached_to"] = attached_to
         resources.append(make_resource(arn, "IAM Policy", None, policy["PolicyName"], attributes))
     return resources
+
+
+def list_entities(iam, policy_arn: str) -> dict:
+    entities = {"users": [], "roles": [], "groups": []}
+    for page in iam.get_paginator("list_entities_for_policy").paginate(PolicyArn=policy_arn):
+        entities["users"] += [user["UserName"] for user in page["PolicyUsers"]]
+        entities["roles"] += [role["RoleName"] for role in page["PolicyRoles"]]
+        entities["groups"] += [group["GroupName"] for group in page["PolicyGroups"]]
+    return entities
 
 
 def collect_roles(session, profile_arns: list[str], errors: list) -> list[dict]:

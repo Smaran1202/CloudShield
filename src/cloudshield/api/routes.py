@@ -10,12 +10,15 @@ from cloudshield.api.schemas import (
     FindingDetailOut,
     FindingOut,
     ResourceOut,
+    RiskSummaryOut,
     ScanOut,
     ScanRequest,
+    TrendPoint,
 )
 from cloudshield.db import store
 from cloudshield.db.models import ACCOUNT_ID, FindingRow, ResourceRow, ScanRow
 from cloudshield.findings import SEVERITIES, FindingStatus, Severity
+from cloudshield.risk.environment import environment_score, severity_counts
 
 router = APIRouter(prefix="/api")
 
@@ -95,6 +98,43 @@ def list_findings(
             query = query.where(getattr(FindingRow, column) == value)
     rows = session.scalars(query).all()
     return sorted(rows, key=lambda r: (SEVERITIES.index(r.severity), r.rule_id, r.resource_id))
+
+
+@router.get("/risk/summary", response_model=RiskSummaryOut)
+def risk_summary(session: Annotated[Session, Depends(get_session)]) -> RiskSummaryOut:
+    query = select(FindingRow).where(
+        FindingRow.account_id == ACCOUNT_ID, FindingRow.status == "OPEN"
+    )
+    open_rows = session.scalars(query).all()
+    scored = [row for row in open_rows if row.risk_score is not None]
+    top = sorted(scored, key=lambda r: (-r.risk_score, SEVERITIES.index(r.severity), r.resource_id))
+    return RiskSummaryOut(
+        environment_score=environment_score([row.risk_score for row in scored]),
+        counts_by_severity=severity_counts([row.severity for row in open_rows]),
+        top_findings=[FindingOut.model_validate(row) for row in top[:5]],
+    )
+
+
+@router.get("/risk/trend", response_model=list[TrendPoint])
+def risk_trend(session: Annotated[Session, Depends(get_session)]) -> list[TrendPoint]:
+    query = (
+        select(ScanRow)
+        .where(
+            ScanRow.account_id == ACCOUNT_ID,
+            ScanRow.status == "completed",
+            ScanRow.environment_score.is_not(None),
+        )
+        .order_by(ScanRow.id)
+    )
+    return [
+        TrendPoint(
+            scan_id=scan.id,
+            finished_at=scan.finished_at,
+            environment_score=scan.environment_score,
+            severity_counts=scan.severity_counts,
+        )
+        for scan in session.scalars(query)
+    ]
 
 
 @router.get("/findings/{finding_id}", response_model=FindingDetailOut)

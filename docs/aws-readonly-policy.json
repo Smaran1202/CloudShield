@@ -15,6 +15,7 @@
         "ec2:DescribeSecurityGroups",
         "iam:ListPolicies",
         "iam:GetPolicyVersion",
+        "iam:ListEntitiesForPolicy",
         "iam:GetPolicy",
         "iam:GetInstanceProfile",
         "iam:ListAttachedRolePolicies",

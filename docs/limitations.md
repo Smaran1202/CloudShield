@@ -52,3 +52,17 @@
 - Only one scan can run at a time. This is enforced inside one server process, so run a single
   API process. A scan left unfinished by a crash is marked failed when the server starts again.
 - There are no accounts or logins yet; every row has `account_id` "local".
+
+## Risk scores
+
+- The attached factor only looks at EC2 instances. A security group used by a load balancer, a
+  database or a Lambda function can still be reported as not attached.
+- If any EC2 error occurs in a scan, or the group's region was not scanned, the attached factor is
+  unknown for every security group in that scan.
+- A policy attached only to a group counts as attached, because the group's members get its
+  permissions. Whether the group has any members is not checked.
+- Only customer-managed policies have attachment data. Roles get no privilege factor.
+- Exposure is configuration only: route tables, network ACLs and other controls are not checked.
+- Findings from a previous scan that were not detected again are not rescored. Findings stored
+  before the risk migration have no score or evidence until the next scan sees them again.
+- `severity_counts` counts every open finding, including INFO. The environment score does not.

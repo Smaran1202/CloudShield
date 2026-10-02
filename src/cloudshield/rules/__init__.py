@@ -1,5 +1,6 @@
 from cloudshield.findings import Finding, make_finding_id
 from cloudshield.rules import iam, privesc, s3, security_groups
+from cloudshield.rules.evidence import build_evidence
 from cloudshield.rules.rule import Rule
 
 ALL_RULES = s3.RULES + security_groups.RULES + iam.RULES + privesc.RULES
@@ -26,6 +27,7 @@ def run_rules(resources: list[dict], rules: list[Rule] = ALL_RULES) -> list[Find
                     category=rule.category,
                     status="OPEN",
                     details=hit.details,
+                    evidence=build_evidence(rule.id, hit.details, resource["resource_type"]),
                 )
             )
     return sorted(findings, key=lambda f: (f.rule_id, f.resource_id, f.finding_id))

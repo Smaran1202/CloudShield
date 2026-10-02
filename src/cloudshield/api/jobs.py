@@ -5,6 +5,7 @@ import boto3
 from sqlalchemy.orm import Session, sessionmaker
 
 from cloudshield.db import store
+from cloudshield.risk.scoring import score_findings
 from cloudshield.rules import run_rules
 from cloudshield.scanner.scan import scan_account
 
@@ -30,7 +31,7 @@ def run_scan_job(
         try:
             result = scan_function(regions)
             store.set_progress(session, scan_id, "Running rules and saving findings")
-            findings = run_rules(result["resources"])
+            findings = score_findings(run_rules(result["resources"]), result, regions)
             store.save_result(session, scan_id, result, findings)
         except Exception as exc:
             # The scan runs in a background thread, so the error has to be recorded on the scan

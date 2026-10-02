@@ -17,6 +17,7 @@ needs no permission.
 | EC2 | `describe_security_groups` | `ec2:DescribeSecurityGroups` | security group rules |
 | IAM | `list_policies` (local only) | `iam:ListPolicies` | customer-managed policies |
 | IAM | `get_policy_version` | `iam:GetPolicyVersion` | policy documents |
+| IAM | `list_entities_for_policy` | `iam:ListEntitiesForPolicy` | which users, roles and groups a customer-managed policy is attached to |
 | IAM | `get_policy` | `iam:GetPolicy` | default version of policies attached to a role |
 | IAM | `get_instance_profile` | `iam:GetInstanceProfile` | the roles inside an instance profile |
 | IAM | `list_attached_role_policies` | `iam:ListAttachedRolePolicies` | managed policies on a role |

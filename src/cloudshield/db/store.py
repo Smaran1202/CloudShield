@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from cloudshield.db.models import ACCOUNT_ID, FindingRow, ResourceRow, ScanRow
 from cloudshield.findings import Finding
+from cloudshield.risk.environment import environment_score, severity_counts
 
 # The scanner service that has to run without errors before a finding of this type can be
 # called fixed.
@@ -75,6 +76,7 @@ def save_result(session: Session, scan_id: int, result: dict, findings: list[Fin
     save_resources(session, scan_id, result["resources"])
     save_findings(session, scan_id, findings, now)
     resolve_fixed(session, scan, result, {f.finding_id for f in findings}, now)
+    save_environment_score(session, scan)
     scan.status = "completed"
     scan.progress = "Done"
     scan.finished_at = now
@@ -113,11 +115,24 @@ def save_findings(session: Session, scan_id: int, findings: list[Finding], now: 
         row.severity = finding.severity
         row.category = finding.category
         row.details = finding.details
+        row.evidence = finding.evidence
+        row.risk_score = finding.risk_score
+        row.risk_factors = finding.risk_factors
         row.status = "OPEN"
         row.resolved_at = None
         row.resolution_reason = None
         row.last_seen_at = now
         row.last_scan_id = scan_id
+
+
+def save_environment_score(session: Session, scan: ScanRow) -> None:
+    query = select(FindingRow).where(
+        FindingRow.account_id == ACCOUNT_ID, FindingRow.status == "OPEN"
+    )
+    open_rows = session.scalars(query).all()
+    scores = [row.risk_score for row in open_rows if row.risk_score is not None]
+    scan.environment_score = environment_score(scores)
+    scan.severity_counts = severity_counts([row.severity for row in open_rows])
 
 
 def resolve_fixed(

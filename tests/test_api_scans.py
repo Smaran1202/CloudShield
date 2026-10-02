@@ -393,3 +393,140 @@ def test_default_scanner_runs_against_mocked_aws(tmp_path):
     buckets = client.get("/api/resources", params={"resource_type": "S3"}).json()
     assert [r["resource_id"] for r in buckets] == ["mock-bucket"]
     assert findings_by_rule(client, "CIS-S3-001")[0]["resource_id"] == "mock-bucket"
+
+
+def instance(state="running", groups=("sg-1",)) -> dict:
+    attributes = {
+        "state": state,
+        "security_group_ids": list(groups),
+        "has_public_ip": True,
+        "instance_profile_arn": None,
+    }
+    return make_resource("i-1", "EC2", "ap-southeast-2", "i-1", attributes)
+
+
+def attached_wildcard_policy() -> dict:
+    document = {"Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}
+    attributes = {
+        "document": document,
+        "attached_to": {"users": [], "roles": ["app"], "groups": []},
+    }
+    return make_resource("arn:aws:iam::1:policy/p", "IAM Policy", None, "p", attributes)
+
+
+def test_findings_include_risk_score_factors_and_evidence(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    client = make_client(tmp_path, scan_returning(result([bucket("a", "Enabled", open_block)])))
+    run_scan(client)
+
+    finding = findings_by_rule(client, "CIS-S3-001")[0]
+    detail = client.get(f"/api/findings/{finding['finding_id']}").json()
+    info = findings_by_rule(client, "CIS-S3-002")[0]
+
+    assert finding["risk_score"] == 85
+    assert finding["risk_factors"][0]["factor"] == "exposure"
+    assert finding["risk_factors"][0]["adjustment"] == 15
+    assert detail["risk_score"] == 85
+    assert detail["evidence"]["items"][2]["fact"] == "BlockPublicPolicy"
+    assert detail["evidence"]["items"][2]["value"] is False
+    assert detail["evidence"]["items"][2]["certainty"] == "verified"
+    assert info["risk_score"] is None
+    assert info["risk_factors"] == []
+
+
+def test_scan_stores_the_environment_score_and_severity_counts(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    client = make_client(tmp_path, scan_returning(result([bucket("a", "Enabled", open_block)])))
+
+    scan = run_scan(client)
+
+    assert scan["environment_score"] == 85.0
+    assert scan["severity_counts"] == {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 0, "LOW": 0, "INFO": 1}
+
+
+def test_resolved_finding_keeps_its_score_but_leaves_the_environment_score(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    broken = result([bucket("a", "Enabled", open_block)])
+    fixed = result([bucket("a", "Enabled", ALL_ON)])
+    client = make_client(tmp_path, scan_returning(broken, fixed))
+    run_scan(client)
+
+    second = run_scan(client)
+
+    resolved = findings_by_rule(client, "CIS-S3-001")[0]
+    summary = client.get("/api/risk/summary").json()
+    assert resolved["status"] == "RESOLVED"
+    assert resolved["risk_score"] == 85
+    assert second["environment_score"] == 0.0
+    assert summary["environment_score"] == 0.0
+    assert summary["counts_by_severity"]["HIGH"] == 0
+    assert summary["top_findings"] == []
+
+
+def test_trend_has_one_point_per_completed_scan(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    broken = result([bucket("a", "Enabled", open_block)])
+    fixed = result([bucket("a", "Enabled", ALL_ON)])
+    client = make_client(tmp_path, scan_returning(broken, fixed))
+    first = run_scan(client)
+    second = run_scan(client)
+
+    trend = client.get("/api/risk/trend").json()
+
+    assert [point["scan_id"] for point in trend] == [first["id"], second["id"]]
+    assert [point["environment_score"] for point in trend] == [85.0, 0.0]
+    assert trend[0]["severity_counts"]["HIGH"] == 1
+    assert trend[1]["severity_counts"]["HIGH"] == 0
+    assert trend[0]["finished_at"].endswith("Z")
+
+
+def test_trend_skips_scans_that_failed(tmp_path):
+    calls = []
+
+    def scan_once_then_fail(regions):
+        if calls:
+            raise RuntimeError("boom")
+        calls.append(1)
+        return result([bucket()])
+
+    client = make_client(tmp_path, scan_once_then_fail)
+    run_scan(client)
+    run_scan(client)
+
+    assert len(client.get("/api/risk/trend").json()) == 1
+
+
+def test_risk_summary_has_the_environment_score_counts_and_top_five(tmp_path):
+    resources = [
+        bucket("a", "Disabled", {name: False for name in ALL_ON}),
+        bucket("b", "Disabled", ALL_ON),
+        open_group(),
+        instance(),
+        attached_wildcard_policy(),
+    ]
+    client = make_client(tmp_path, scan_returning(result(resources)))
+    run_scan(client, ["us-east-1", "ap-southeast-2"])
+
+    summary = client.get("/api/risk/summary").json()
+
+    assert [f["risk_score"] for f in summary["top_findings"]] == [95, 85, 80, 80, 55]
+    assert summary["top_findings"][0]["rule_id"] == "CIS-SG-001"
+    assert summary["counts_by_severity"] == {
+        "CRITICAL": 0,
+        "HIGH": 4,
+        "MEDIUM": 2,
+        "LOW": 0,
+        "INFO": 2,
+    }
+    assert summary["environment_score"] == 100.0
+
+
+def test_risk_summary_with_no_scans_is_all_zero(tmp_path):
+    client = make_client(tmp_path)
+
+    summary = client.get("/api/risk/summary").json()
+
+    assert summary["environment_score"] == 0.0
+    assert set(summary["counts_by_severity"].values()) == {0}
+    assert summary["top_findings"] == []
+    assert client.get("/api/risk/trend").json() == []

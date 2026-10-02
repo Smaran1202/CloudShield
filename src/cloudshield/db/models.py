@@ -25,6 +25,8 @@ class ScanRow(Base):
     resource_count: Mapped[int] = mapped_column(default=0)
     finding_count: Mapped[int] = mapped_column(default=0)  # findings this scan detected
     error_count: Mapped[int] = mapped_column(default=0)
+    environment_score: Mapped[float | None]  # from the open findings when the scan finished
+    severity_counts: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     errors: Mapped[list] = mapped_column(JSON, default=list)
     failure_message: Mapped[str | None]
 
@@ -58,6 +60,9 @@ class FindingRow(Base):
     category: Mapped[str]
     status: Mapped[str]  # OPEN or RESOLVED
     details: Mapped[dict] = mapped_column(JSON)
+    evidence: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    risk_score: Mapped[int | None]  # None for findings that do not count toward risk
+    risk_factors: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     first_seen_at: Mapped[datetime]
     last_seen_at: Mapped[datetime]
     resolved_at: Mapped[datetime | None]
