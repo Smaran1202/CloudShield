@@ -116,7 +116,7 @@ def test_phase_4_data_survives_the_fixes_migration_and_a_fix_can_be_made(tmp_pat
             text(
                 "insert into resources (resource_id, resource_type, region, name, attributes, "
                 "last_seen_scan_id) values ('old-bucket', 'S3', 'us-east-1', 'old-bucket', "
-                "'{\"versioning\": \"Disabled\"}', 1)"
+                '\'{"versioning": "Disabled"}\', 1)'
             )
         )
         connection.execute(

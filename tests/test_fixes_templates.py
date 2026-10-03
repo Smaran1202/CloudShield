@@ -325,6 +325,7 @@ def test_bucket_names_that_start_with_a_digit_get_a_valid_terraform_label():
 
     fix = build_fix(finding("CIS-S3-003", {"versioning": "Disabled"}), numbered)
 
-    assert 'resource "aws_s3_bucket_versioning" "bucket_123_bucket"' in (
-        by_format(fix, "terraform")["content"]
+    assert (
+        'resource "aws_s3_bucket_versioning" "bucket_123_bucket"'
+        in (by_format(fix, "terraform")["content"])
     )
