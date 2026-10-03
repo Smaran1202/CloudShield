@@ -4,7 +4,7 @@ from cloudshield.api.app import create_app
 
 
 def test_health_returns_ok_and_version():
-    client = TestClient(create_app())
+    client = TestClient(create_app(load_env=False))
 
     response = client.get("/api/health")
 
@@ -16,7 +16,7 @@ def test_health_returns_ok_and_version():
 
 def test_cors_allows_only_the_frontend_origin(monkeypatch):
     monkeypatch.setenv("FRONTEND_ORIGIN", "http://localhost:5173")
-    client = TestClient(create_app())
+    client = TestClient(create_app(load_env=False))
 
     allowed = client.get("/api/health", headers={"Origin": "http://localhost:5173"})
     other = client.get("/api/health", headers={"Origin": "http://evil.example"})
@@ -27,7 +27,7 @@ def test_cors_allows_only_the_frontend_origin(monkeypatch):
 
 def test_cors_allows_the_frontend_to_post(monkeypatch):
     monkeypatch.setenv("FRONTEND_ORIGIN", "http://localhost:5173")
-    client = TestClient(create_app())
+    client = TestClient(create_app(load_env=False))
 
     response = client.options(
         "/api/scans",

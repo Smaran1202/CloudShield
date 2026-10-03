@@ -15,18 +15,22 @@ dependencies = [
     "boto3",
     "sqlalchemy",
     "alembic",
+    "httpx",
+    "python-dotenv",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
     "ruff",
-    "httpx",
     "moto[ec2,iam,s3]",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+cloudshield = ["ai/knowledge/*.md", "db/migrations/script.py.mako"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

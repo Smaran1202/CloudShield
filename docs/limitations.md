@@ -66,3 +66,23 @@
 - Findings from a previous scan that were not detected again are not rescored. Findings stored
   before the risk migration have no score or evidence until the next scan sees them again.
 - `severity_counts` counts every open finding, including INFO. The environment score does not.
+
+## Fixes
+
+- CloudShield never writes to AWS and never runs a generated command. A fix is text. The export
+  command writes it to files for you to review and apply yourself.
+- Patches use only values from the scan: bucket name, group id, region and the open rule. Names are
+  checked against a strict pattern, and anything else is refused instead of being quoted.
+- The Terraform and CloudFormation patches for S3 describe the setting for the named bucket. If
+  the bucket is not managed by that tool, you have to import it or adapt the patch. For security
+  groups they are instructions, not code, because the existing definition is not known.
+- The AWS CLI patch for a security group uses a JSON file with the exact rule, so it works for
+  port ranges, all protocols and IPv6. It removes only the open address range from that rule.
+- Findings for IAM policies and roles have guidance only, no patch.
+- Blast radius uses stored data only. Website hosting, ACLs, flow logs, CloudTrail and
+  last-accessed data are not collected, so those parts are unknown, and unknown is never reported
+  as low. Running instances are taken from the scan that last saw the finding.
+- The AI explanation is optional text. It is checked against the data, but not every invented name
+  can be detected. See `ai-data.md`.
+- The hourly AI limit is counted in the memory of one server process and starts again when the
+  server restarts.

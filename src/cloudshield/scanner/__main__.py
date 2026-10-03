@@ -5,10 +5,13 @@ from collections import Counter
 
 import boto3
 
+from cloudshield.config import load_env_file
 from cloudshield.scanner.scan import scan_account
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None, load_env: bool = True) -> int:
+    if load_env:
+        load_env_file()
     parser = argparse.ArgumentParser(prog="python -m cloudshield.scanner")
     parser.add_argument("--profile", help="AWS profile name (default: AWS_PROFILE or the chain)")
     parser.add_argument("--regions", help="comma separated regions (default: AWS_REGION)")

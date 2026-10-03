@@ -6,6 +6,8 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
 from cloudshield.findings import Certainty, FindingStatus, Severity
 
 ScanStatus = Literal["queued", "running", "completed", "failed"]
+BlastLevel = Literal["low", "medium", "high", "unknown"]
+PatchFormat = Literal["terraform", "cloudformation", "cli"]
 Region = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
 # The database stores UTC without a timezone; the API always says it is UTC.
 UtcDateTime = Annotated[datetime, AfterValidator(lambda value: value.replace(tzinfo=UTC))]
@@ -106,6 +108,53 @@ class TrendPoint(BaseModel):
     finished_at: UtcDateTime
     environment_score: float
     severity_counts: dict[str, int]
+
+
+class PatchFile(BaseModel):
+    name: str
+    content: str
+
+
+class PatchOut(BaseModel):
+    format: PatchFormat
+    title: str
+    content: str
+    files: list[PatchFile]
+    needs_input: bool
+    inputs_needed: list[str]
+    instructions_only: bool
+
+
+class BlastRadiusOut(BaseModel):
+    level: BlastLevel
+    factors: list[EvidenceItem]
+    notes: list[str]
+
+
+class ExplanationOut(BaseModel):
+    why_it_matters: str
+    what_changes: str
+    what_could_break: str
+    cited: list[str]
+    skipped_reason: str | None = None
+
+
+class FixOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    finding_id: str
+    evidence_hash: str
+    blast_radius: BlastRadiusOut
+    patches: list[PatchOut]
+    guidance: list[str]
+    pre_checks: list[str]
+    rollback: str
+    verify: str
+    explanation: ExplanationOut
+    generated_by: Literal["gemini", "template"]
+    model: str | None
+    generation_ms: int
+    created_at: UtcDateTime
 
 
 class FindingDetailOut(FindingOut):

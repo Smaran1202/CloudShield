@@ -11,3 +11,4 @@ dist/
 CLAUDE.md
 .claude/
 scan-output*.json
+fixes-out/

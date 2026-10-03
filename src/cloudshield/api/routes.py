@@ -9,6 +9,7 @@ from cloudshield.api.jobs import run_scan_job
 from cloudshield.api.schemas import (
     FindingDetailOut,
     FindingOut,
+    FixOut,
     ResourceOut,
     RiskSummaryOut,
     ScanOut,
@@ -16,8 +17,9 @@ from cloudshield.api.schemas import (
     TrendPoint,
 )
 from cloudshield.db import store
-from cloudshield.db.models import ACCOUNT_ID, FindingRow, ResourceRow, ScanRow
+from cloudshield.db.models import ACCOUNT_ID, FindingRow, FixRow, ResourceRow, ScanRow
 from cloudshield.findings import SEVERITIES, FindingStatus, Severity
+from cloudshield.fixes.service import make_fix
 from cloudshield.risk.environment import environment_score, severity_counts
 
 router = APIRouter(prefix="/api")
@@ -149,3 +151,35 @@ def get_finding(
     if resource is not None:
         finding.resource = ResourceOut.model_validate(resource)
     return finding
+
+
+@router.post("/findings/{finding_id}/fix", response_model=FixOut)
+def create_fix(
+    finding_id: str,
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    refresh: bool = False,
+) -> FixRow:
+    finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
+    if finding is None:
+        raise HTTPException(status_code=404, detail="Finding not found.")
+    if finding.status == "RESOLVED":
+        stored = session.get(FixRow, (ACCOUNT_ID, finding_id))
+        if stored is None:
+            raise HTTPException(status_code=409, detail="This finding is resolved and has no fix.")
+        return stored
+    state = request.app.state
+    try:
+        return make_fix(
+            session, finding, state.settings, state.ai_limit, state.gemini_transport, refresh
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/findings/{finding_id}/fix", response_model=FixOut)
+def get_stored_fix(finding_id: str, session: Annotated[Session, Depends(get_session)]) -> FixRow:
+    fix = session.get(FixRow, (ACCOUNT_ID, finding_id))
+    if fix is None:
+        raise HTTPException(status_code=404, detail="No stored fix for this finding.")
+    return fix

@@ -20,7 +20,17 @@ cd ..
 ```
 
 Settings come from environment variables. The names are listed in `.env.example`. All of them
-have defaults or are optional at this stage. To set one for the current PowerShell session:
+have defaults or are optional. The simplest way to set them is a `.env` file in the folder you run
+the commands from:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Then fill in the values you need in `.env`. The API, `python -m cloudshield.scanner` and
+`python -m cloudshield.fixes` read it when they start. A variable that is already set in your shell
+wins over the file. `.env` is ignored by git, so keys in it are never committed. To set one for the
+current PowerShell session instead:
 
 ```powershell
 $env:FRONTEND_ORIGIN = "http://localhost:5173"
@@ -57,6 +67,20 @@ $scan = Invoke-RestMethod -Method Post http://localhost:8000/api/scans
 Invoke-RestMethod http://localhost:8000/api/scans/$($scan.id)
 Invoke-RestMethod http://localhost:8000/api/findings
 ```
+
+Request a fix for a finding and export it to files you can review. CloudShield only writes text;
+it never runs anything in your account:
+
+```powershell
+$id = (Invoke-RestMethod "http://localhost:8000/api/findings?status=OPEN")[0].finding_id
+Invoke-RestMethod -Method Post "http://localhost:8000/api/findings/$id/fix"
+python -m cloudshield.fixes export $id --dir fixes-out
+```
+
+An AI explanation is optional. Set `GEMINI_API_KEY`, `GEMINI_MODEL` and, if you want one,
+`GEMINI_FALLBACK_MODEL` in the API's environment. Without them a fixed template explanation is
+used. See `docs/ai-data.md` for exactly what is sent. To test the settings, run
+`python -m cloudshield.fixes ai-check` in the same window where you set them.
 
 In a second terminal, start the web app:
 

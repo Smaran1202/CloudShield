@@ -67,7 +67,7 @@ def test_cli_prints_counts_and_writes_the_output_file(tmp_path, capsys):
     make_session().client("s3").create_bucket(Bucket="cli-bucket")
     out_file = tmp_path / "scan-output.json"
 
-    exit_code = main(["--regions", "us-east-1", "--out", str(out_file)])
+    exit_code = main(["--regions", "us-east-1", "--out", str(out_file)], load_env=False)
 
     printed = capsys.readouterr().out
     saved = json.loads(out_file.read_text(encoding="utf-8"))

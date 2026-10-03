@@ -31,7 +31,7 @@ OPEN_SSH = {
 def make_client(tmp_path, scan_function=None) -> TestClient:
     url = f"sqlite:///{tmp_path / 'test.db'}"
     Base.metadata.create_all(make_engine(url))
-    return TestClient(create_app(database_url=url, scan_function=scan_function))
+    return TestClient(create_app(database_url=url, scan_function=scan_function, load_env=False))
 
 
 def scan_returning(*results):

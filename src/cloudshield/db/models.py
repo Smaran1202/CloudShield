@@ -45,6 +45,27 @@ class ResourceRow(Base):
     last_seen_scan_id: Mapped[int] = mapped_column(ForeignKey("scans.id"))
 
 
+class FixRow(Base):
+    __tablename__ = "fixes"
+
+    account_id: Mapped[str] = mapped_column(
+        primary_key=True, default=ACCOUNT_ID, server_default=ACCOUNT_ID
+    )
+    finding_id: Mapped[str] = mapped_column(primary_key=True)
+    evidence_hash: Mapped[str]
+    blast_radius: Mapped[dict] = mapped_column(JSON)
+    patches: Mapped[list] = mapped_column(JSON)
+    guidance: Mapped[list] = mapped_column(JSON)
+    pre_checks: Mapped[list] = mapped_column(JSON)
+    rollback: Mapped[str]
+    verify: Mapped[str]
+    explanation: Mapped[dict] = mapped_column(JSON)
+    generated_by: Mapped[str]  # gemini or template
+    model: Mapped[str | None]
+    generation_ms: Mapped[int]
+    created_at: Mapped[datetime]
+
+
 class FindingRow(Base):
     __tablename__ = "findings"
 
