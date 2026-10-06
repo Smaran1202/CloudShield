@@ -1,27 +1,25 @@
-import { useEffect, useState } from "react";
-
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-
-type Health = { status: string; version: string };
+import { Route, Routes } from "react-router-dom";
+import { Layout } from "./components/Layout";
+import { EmptyState } from "./components/ui";
+import { FindingDetail } from "./pages/FindingDetail";
+import { Findings } from "./pages/Findings";
+import { Overview } from "./pages/Overview";
+import { ResourceDetail } from "./pages/ResourceDetail";
+import { Resources } from "./pages/Resources";
+import { Scans } from "./pages/Scans";
 
 export default function App() {
-  const [health, setHealth] = useState<Health | null | "loading">("loading");
-
-  useEffect(() => {
-    fetch(`${API_URL}/api/health`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(res.statusText))))
-      .then(setHealth)
-      .catch(() => setHealth(null));
-  }, []);
-
-  let text = "Checking API...";
-  if (health === null) text = "API offline";
-  else if (health !== "loading") text = `API online (version ${health.version})`;
-
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-2">
-      <h1 className="text-3xl font-semibold">CloudShield</h1>
-      <p className={health === null ? "text-red-600" : "text-slate-700"}>{text}</p>
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route index element={<Overview />} />
+        <Route path="findings" element={<Findings />} />
+        <Route path="findings/:findingId" element={<FindingDetail />} />
+        <Route path="resources" element={<Resources />} />
+        <Route path="resources/:resourceId" element={<ResourceDetail />} />
+        <Route path="scans" element={<Scans />} />
+        <Route path="*" element={<EmptyState title="Page not found" />} />
+      </Route>
+    </Routes>
   );
 }

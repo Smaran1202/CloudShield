@@ -89,8 +89,21 @@ cd web
 npm run dev
 ```
 
-Open http://localhost:5173. The page shows "API online (version x)" when the API is reachable.
-The API health check is also at http://localhost:8000/api/health.
+Open http://localhost:5173. The header shows "API online v{version}" when the API is reachable,
+the last scan, and the Run scan button. The dashboard has an Overview (a board of what to fix now,
+next and later), Findings (with a detail page for each), Resources and Scans. It only reads from the
+API and starts scans. It never changes anything in AWS.
+
+The web app loads three fonts (Bricolage Grotesque, Public Sans and IBM Plex Mono) from Google Fonts,
+so your browser contacts Google Fonts when the page opens. If that is blocked, the page falls back to
+system fonts and works the same.
+
+The web app's own tests, which use a mocked API, run with:
+
+```powershell
+cd web
+npm test
+```
 
 ## Checks
 
@@ -105,6 +118,7 @@ Then in `web/`:
 ```powershell
 npx prettier --check .
 npm run build
+npm test
 ```
 
 Continuous integration also runs `ruff check` and `ruff format --check` on the Python code.

@@ -1,0 +1,70 @@
+/* The design tokens. Colours, fonts, type sizes and radii are only defined here. */
+@theme {
+  --color-ink: #14110f;
+  --color-paper: #f6f5f1;
+  --color-red: #c8331c;
+  --color-blue: #2347d8;
+  --color-green: #1f7a4d;
+  --color-lane-grey: #e3e1da;
+  --color-later-dot: #8a847a;
+  --color-dim: #4a453f;
+  --color-divider: #efede7;
+  --color-dash: #6b655d;
+  --color-focus: #2347d8;
+
+  --color-chip-high-bg: #ffe3dd;
+  --color-chip-high-text: #8a1f10;
+  --color-chip-ok-bg: #dcefe4;
+  --color-chip-ok-text: #14573a;
+  --color-chip-unknown-bg: #e3e1da;
+  --color-chip-unknown-text: #3a352f;
+  --color-chip-warn-bg: #fff0cc;
+  --color-chip-warn-text: #6b4a00;
+  --color-chip-info-bg: #e4ecff;
+  --color-chip-info-text: #1b3aa6;
+  --color-notice: #ffd84d;
+
+  --font-display: "Bricolage Grotesque", "Arial Black", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* The type scale. 12px is for tags only. Nothing that is a sentence is under 14px. */
+  --text-wordmark: 28px;
+  --text-tag: 12px;
+  --text-label: 13px;
+  --text-secondary: 14px;
+  --text-body: 16px;
+  --text-title: 20px;
+  --text-h3: 24px;
+  --text-h2: 32px;
+  --text-h1: 48px;
+  --text-page: clamp(48px, 7vw, 96px);
+  --text-detail: clamp(36px, 5vw, 64px);
+  --text-display: clamp(56px, 9vw, 120px);
+  --text-score-row: 44px;
+  --text-score-tile: 64px;
+  --text-score-lane: 88px;
+
+  --radius-chip: 6px;
+  --radius-lane: 10px;
+}
+
+:root {
+  /* The spacing scale. Use these steps, and no others, for padding, margins and gaps. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* The only shadow: the lifted hover state of a tile. */
+  --shadow-lift: 6px 6px 0 var(--color-ink);
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}

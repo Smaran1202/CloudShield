@@ -1,1 +1,99 @@
 @import "tailwindcss";
+@import "./tokens.css";
+@import "./motion.css";
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stills for the things that animate: shown fully when motion is off. */
+.tile:hover,
+.tile:focus-within {
+  transform: translate(-3px, -3px);
+  box-shadow: var(--shadow-lift);
+}
+
+/* The sliding segment fills the track when it cannot slide, so it never looks like progress. */
+.scan-bar > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-ink);
+  opacity: 0.35;
+}
+
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 3px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+
+.check path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mask-line {
+  display: block;
+  overflow: hidden;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+.mask-line > span {
+  display: block;
+}
+
+.board-row[data-muted="true"] {
+  color: var(--color-dim);
+}
+
+.board-row:hover,
+.board-row:focus-within {
+  background-color: var(--color-ink);
+  color: #fff;
+}
+
+.chip-flash {
+  background-color: var(--color-green);
+  color: #fff;
+}
+
+/* Native selects, drawn with the page's own fonts and a chevron icon placed over them. */
+.styled-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: none;
+}
+
+/* On a mouse the copy button appears on hover or focus; on touch it is always there. */
+@media (hover: hover) {
+  .copy-reveal {
+    opacity: 0;
+  }
+
+  .tile:hover .copy-reveal,
+  .tile:focus-within .copy-reveal,
+  .copy-reveal:focus-visible {
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  background-color: var(--color-lane-grey);
+}

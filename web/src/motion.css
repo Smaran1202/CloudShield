@@ -1,0 +1,176 @@
+/*
+ * Every animation and transition lives inside this one media query. Without it the page is
+ * complete and still: nothing is hidden waiting for an animation to show it.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes mask {
+    from {
+      transform: translateY(105%);
+    }
+    to {
+      transform: none;
+    }
+  }
+
+  @keyframes pulse {
+    0% {
+      box-shadow: 0 0 0 0 rgb(255 255 255 / 0.75);
+    }
+    70%,
+    100% {
+      box-shadow: 0 0 0 14px rgb(255 255 255 / 0);
+    }
+  }
+
+  @keyframes wipe {
+    from {
+      clip-path: inset(0 100% 0 0);
+    }
+    to {
+      clip-path: inset(0 0 0 0);
+    }
+  }
+
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 30;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(340%);
+    }
+  }
+
+  .rise {
+    animation: rise 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .mask-line > span {
+    animation: mask 850ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  .pulse-dot {
+    animation: pulse 2.2s infinite;
+  }
+
+  .done-strip {
+    animation: wipe 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 700ms both;
+  }
+
+  .check path {
+    stroke-dasharray: 30;
+    animation: draw 550ms ease-out both;
+  }
+
+  .fade-up {
+    animation: fade-up 350ms ease-out both;
+  }
+
+  .pop {
+    animation: pop 500ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  }
+
+  .spinner {
+    animation: spin 0.8s linear infinite;
+  }
+
+  .scan-bar.scan-bar > span {
+    width: 30%;
+    opacity: 1;
+    animation: slide 1.4s ease-in-out infinite;
+  }
+
+  .tile,
+  .board-row {
+    transition:
+      transform 180ms ease-out,
+      box-shadow 180ms ease-out,
+      background-color 180ms ease-out,
+      color 180ms ease-out;
+  }
+
+  .arrow {
+    display: inline-block;
+    transition: transform 180ms ease-out;
+  }
+
+  .tile:hover .arrow,
+  .board-row:hover .arrow {
+    transform: translateX(6px);
+  }
+
+  button,
+  .press {
+    transition: transform 120ms ease-out;
+  }
+
+  button:active:not(:disabled),
+  .press:active {
+    transform: scale(0.97);
+  }
+
+  @keyframes skeleton {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  .skeleton {
+    animation: skeleton 1.4s ease-in-out infinite;
+  }
+
+  .copy-reveal {
+    transition: opacity 180ms ease-out;
+  }
+}
