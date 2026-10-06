@@ -12,3 +12,5 @@ CLAUDE.md
 .claude/
 scan-output*.json
 fixes-out/
+prowler-output*.json
+samples
