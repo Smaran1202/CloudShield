@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from cloudshield.api.jobs import run_scan_job
 from cloudshield.api.schemas import (
-    FindingDetailOut,
     DispositionIn,
+    FindingDetailOut,
     FindingOut,
     FindingSource,
     FixOut,

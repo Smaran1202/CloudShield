@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cloudshield.db.models import ACCOUNT_ID, FindingRow, ResourceRow, ScanRow
-from cloudshield.findings import Finding
 from cloudshield.dispositions import counts_toward_open
+from cloudshield.findings import Finding
 from cloudshield.imports.merge import reconcile
 from cloudshield.imports.recheck import resolve_gone_resources
 from cloudshield.risk.environment import environment_score, severity_counts
