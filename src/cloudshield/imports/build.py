@@ -58,9 +58,7 @@ def details_for(record: Record) -> dict:
     }
 
 
-def score_record(
-    session: Session, account_id: str, record: Record
-) -> tuple[int | None, list, str]:
+def score_record(session: Session, account_id: str, record: Record) -> tuple[int | None, list, str]:
     """The base score comes from the severity only. Our own context is added only when the same
     resource id is in our own scanned resources."""
     if record.severity == "INFO":

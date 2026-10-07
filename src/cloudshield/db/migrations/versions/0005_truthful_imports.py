@@ -39,7 +39,7 @@ def upgrade() -> None:
     op.execute("update findings set score_basis = 'context adjusted' where source = 'cloudshield'")
     op.execute(
         "update findings set score_basis = 'context adjusted' where source = 'prowler' "
-        "and risk_score is not null and risk_factors not like '%\"factor\": \"context\"%'"
+        'and risk_score is not null and risk_factors not like \'%"factor": "context"%\''
     )
 
     op.add_column("imports", sa.Column("file_name", sa.String(), nullable=True))

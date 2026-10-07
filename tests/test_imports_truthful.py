@@ -308,9 +308,7 @@ def test_when_ours_is_open_and_the_import_passes_both_stay_visible_and_are_flagg
     ours = by_rule(client, "CIS-S3-001")
     assert ours["tools_disagree"] is True
     assert ours["corroborated_by"][0]["status"] == "PASS"
-    assert "Also reported by an imported scan" not in [
-        i["fact"] for i in ours["evidence"]["items"]
-    ]
+    assert "Also reported by an imported scan" not in [i["fact"] for i in ours["evidence"]["items"]]
     assert ours["status"] == "OPEN"
 
 
@@ -420,9 +418,10 @@ def test_an_unknown_attribute_means_no_data_so_nothing_is_flagged_or_merged(tmp_
     assert theirs["merged_into"] is None
     assert theirs["status"] == "OPEN"
     assert NOT_COMPARED in facts(theirs)
-    assert next(i for i in theirs["evidence"]["items"] if i["fact"] == NOT_COMPARED)[
-        "certainty"
-    ] == "unknown"
+    assert (
+        next(i for i in theirs["evidence"]["items"] if i["fact"] == NOT_COMPARED)["certainty"]
+        == "unknown"
+    )
 
 
 def test_an_unknown_attribute_with_an_imported_pass_adds_nothing_and_flags_nothing(tmp_path):
@@ -676,8 +675,8 @@ def test_the_migration_keeps_earlier_data_and_fills_the_new_fields(tmp_path, mon
             text(
                 "insert into imports (id, source, file_sha256, imported_at, counts, "
                 "regions_covered, checks_covered) values (1, 'prowler', 'abc', "
-                "'2026-10-02 00:00:00', '{\"imported\": 2, \"passed\": 0, \"ignored\": 0, "
-                "\"already_seen\": 0, \"resolved\": 0, \"rejected\": 0}', '[]', '[]')"
+                '\'2026-10-02 00:00:00\', \'{"imported": 2, "passed": 0, "ignored": 0, '
+                '"already_seen": 0, "resolved": 0, "rejected": 0}\', \'[]\', \'[]\')'
             )
         )
         rows = [

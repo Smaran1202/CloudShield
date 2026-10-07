@@ -17,9 +17,7 @@ def latest_import_id(session: Session, account_id: str) -> int | None:
     return session.scalar(query)
 
 
-def resolve_gone_resources(
-    session: Session, scan: ScanRow, account_id: str, now: datetime
-) -> int:
+def resolve_gone_resources(session: Session, scan: ScanRow, account_id: str, now: datetime) -> int:
     """Resolves open imported findings that the newest import did not recheck, when our own scan
     shows their resource gone. Returns how many were resolved."""
     newest = latest_import_id(session, account_id)

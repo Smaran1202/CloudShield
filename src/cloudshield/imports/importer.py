@@ -54,9 +54,7 @@ def save_pass(
     counts["passed"] += 1
 
     rule_id = rule_id_of(record.check_id)
-    finding = session.get(
-        FindingRow, (account_id, make_finding_id(rule_id, record.resource_id))
-    )
+    finding = session.get(FindingRow, (account_id, make_finding_id(rule_id, record.resource_id)))
     if finding is not None and finding.status == "OPEN":
         finding.status = "RESOLVED"
         finding.resolved_at = now
