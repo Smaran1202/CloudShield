@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type FindingDetailOut } from "../api";
+import { DismissControls } from "../components/DismissControls";
 import { FixTab } from "../components/FixPanel";
 import { Stepper, stepStates } from "../components/Stepper";
 import { Tabs } from "../components/Tabs";
@@ -10,6 +11,9 @@ import {
   CertaintyChip,
   Check,
   EmptyState,
+  disagreement,
+  FindingFlags,
+  NotRechecked,
   SeverityChip,
   StatusChip,
 } from "../components/ui";
@@ -68,12 +72,22 @@ export function FindingDetail() {
                   {shortResource(finding.resource_id)}
                 </span>
                 <SeverityChip severity={finding.severity} />
+                <FindingFlags finding={finding} />
                 {finding.evidence.items.some((i) => i.certainty === "verified") && (
                   <span className="rounded-chip bg-chip-ok-bg px-3 py-1 text-secondary font-semibold text-chip-ok-text">
                     Verified evidence
                   </span>
                 )}
               </div>
+              {finding.not_rechecked && (
+                <p className="mt-3">
+                  <NotRechecked finding={finding} />
+                </p>
+              )}
+              {finding.tools_disagree && (
+                <p className="mt-3 text-secondary text-dim">{disagreement(finding)}</p>
+              )}
+              <DismissControls finding={finding} onChanged={reload} />
             </div>
             <ScoreTile finding={finding} />
           </div>
@@ -147,6 +161,10 @@ function Summary({ finding }: { finding: FindingDetailOut }) {
     ["First seen", formatDate(finding.first_seen_at)],
     ["Last seen", formatDate(finding.last_seen_at)],
   ];
+  if (finding.source === "prowler") {
+    rows.splice(1, 0, ["Source", "Imported"]);
+    rows.push(["Last import", formatDate(finding.last_imported_at)]);
+  }
   if (finding.status === "RESOLVED") {
     rows.push(["Resolved", formatDate(finding.resolved_at)]);
     rows.push(["Why resolved", finding.resolution_reason ?? "-"]);
@@ -187,34 +205,41 @@ function Evidence({
     );
   }
   return (
-    <ol className="space-y-4">
-      {items.map((item, index) => {
-        const id = `e${index + 1}`;
-        return (
-          <li
-            key={id}
-            id={`evidence-${id}`}
-            className={`rounded-lane border-2 bg-white p-6 ${
-              highlighted === id ? "border-blue ring-4 ring-blue" : "border-ink"
-            }`}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-[4px] border-[1.5px] border-ink px-2 py-1 font-mono text-label">
-                {id}
-              </span>
-              <span className="font-semibold">{item.fact}</span>
-              <CertaintyChip certainty={item.certainty} />
-            </div>
-            <pre className="mt-3 overflow-x-auto font-mono text-secondary break-words whitespace-pre-wrap">
-              {item.value === null ? "no value" : pretty(item.value)}
-            </pre>
-            <p className="mt-3 text-secondary text-dim">
-              Source: <code className="font-mono">{item.source}</code>
-            </p>
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      {finding.source === "prowler" && (
+        <p className="mb-4 text-secondary font-semibold">
+          Reported by an imported scan, not verified by CloudShield.
+        </p>
+      )}
+      <ol className="space-y-4">
+        {items.map((item, index) => {
+          const id = `e${index + 1}`;
+          return (
+            <li
+              key={id}
+              id={`evidence-${id}`}
+              className={`rounded-lane border-2 bg-white p-6 ${
+                highlighted === id ? "border-blue ring-4 ring-blue" : "border-ink"
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-[4px] border-[1.5px] border-ink px-2 py-1 font-mono text-label">
+                  {id}
+                </span>
+                <span className="font-semibold">{item.fact}</span>
+                <CertaintyChip certainty={item.certainty} />
+              </div>
+              <pre className="mt-3 overflow-x-auto font-mono text-secondary break-words whitespace-pre-wrap">
+                {item.value === null ? "no value" : pretty(item.value)}
+              </pre>
+              <p className="mt-3 text-secondary text-dim">
+                Source: <code className="font-mono">{item.source}</code>
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+    </>
   );
 }
 

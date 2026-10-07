@@ -51,6 +51,11 @@ export function scanDuration(scan: Pick<ScanOut, "started_at" | "finished_at">):
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
+// Imported rule ids start with "PRW-". The user sees the check id without it.
+export function ruleLabel(ruleId: string): string {
+  return ruleId.startsWith("PRW-") ? ruleId.slice("PRW-".length) : ruleId;
+}
+
 export function pretty(value: unknown): string {
   if (typeof value === "string") return value;
   return JSON.stringify(value, null, 2) ?? "null";

@@ -25,6 +25,7 @@ def clean_environment(monkeypatch):
         "GEMINI_MODEL",
         "GEMINI_FALLBACK_MODEL",
         "AI_MAX_CALLS_PER_HOUR",
+        "CLOUDSHIELD_OWN_IDENTITIES",
         "AWS_PROFILE",
         "AWS_REGION",
     ]

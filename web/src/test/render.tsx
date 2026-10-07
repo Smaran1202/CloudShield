@@ -8,6 +8,8 @@ import { mockApi } from "./mockApi";
 export const BASE = {
   "GET /api/health": { status: "ok", version: "1.2.3" },
   "GET /api/scans": [],
+  "GET /api/imports": [],
+  "GET /api/resources/imported": [],
 };
 
 export const never = () => new Promise(() => {});

@@ -102,7 +102,7 @@ describe("Overview: the hero", () => {
 
     const headline = await screen.findByRole("heading", { level: 1 });
     expect(within(headline).getByText("2 fixed.")).toBeInTheDocument();
-    expect(within(headline).getByText("6 to go.")).toBeInTheDocument();
+    expect(within(headline).getByText("5 to go.")).toBeInTheDocument();
   });
 
   it("says to start with the highest-risk open finding", async () => {
@@ -194,7 +194,7 @@ describe("Overview: the hero", () => {
 });
 
 describe("certaintySummary", () => {
-  const item = (certainty: "verified" | "heuristic" | "unknown") => ({
+  const item = (certainty: "verified" | "heuristic" | "unknown" | "reported") => ({
     fact: "x",
     value: null,
     source: "s",
@@ -211,6 +211,12 @@ describe("certaintySummary", () => {
       ]),
     ).toBe("3 verified, 1 unknown");
     expect(certaintySummary([item("heuristic")])).toBe("1 heuristic");
+  });
+
+  it("counts reported evidence from an imported finding, and never says there is none", () => {
+    expect(certaintySummary([item("reported"), item("reported"), item("reported")])).toBe(
+      "3 reported",
+    );
   });
 
   it("says so when there is no evidence", () => {
@@ -256,7 +262,7 @@ describe("Overview: the lanes", () => {
       within(lane("Fix now")).getByText("Risk score 80 or more"),
     ).toBeInTheDocument();
     expect(within(lane("Next")).getByText("1")).toBeInTheDocument();
-    expect(within(lane("Later")).getByText("3")).toBeInTheDocument();
+    expect(within(lane("Later")).getByText("2")).toBeInTheDocument();
   });
 
   it("shows an honest message in a lane that is empty", async () => {
@@ -284,7 +290,7 @@ describe("Overview: the lanes", () => {
     ).toBeNull();
     expect(within(lane("Later")).getByRole("link", { name: "See them" })).toHaveAttribute(
       "href",
-      "/findings?lane=later",
+      "/findings?info=only",
     );
   });
 
@@ -425,26 +431,15 @@ describe("Overview: below the lanes", () => {
     expect(progress?.parentElement).toHaveClass("min-[900px]:grid-cols-2");
   });
 
-  it("shows the combined score only as a small figure with its tooltip", async () => {
+  it("shows the highest open risk, and no combined environment score or tooltip", async () => {
     renderApp("/", results);
 
-    const label = await screen.findByText("Combined environment score");
-    const fact = label.closest("div") as HTMLElement;
+    const label = await screen.findByText("Highest open risk");
 
-    expect(fact).toHaveTextContent("99.8");
-    expect(fact.querySelector("dd")).toHaveClass("text-label");
-    expect(screen.getByRole("tooltip")).toHaveTextContent("climbs towards 100");
-    expect(screen.getByRole("tooltip")).toHaveTextContent("the lanes decide the order");
-  });
-
-  it("says when the combined score cannot be loaded, and still shows the board", async () => {
-    renderApp("/", {
-      ...results,
-      "GET /api/risk/summary": fail(500, "summary exploded"),
-    });
-
-    expect(await screen.findByText(/summary exploded/)).toBeInTheDocument();
-    expect(await screen.findByRole("region", { name: "Fix now" })).toBeInTheDocument();
+    expect(label.closest("div")).toHaveTextContent("95");
+    expect(screen.queryByText(/Combined environment score/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(callsTo("GET", "/api/risk/summary")).toHaveLength(0);
   });
 
   it("shows the backend's message when the findings cannot be loaded", async () => {

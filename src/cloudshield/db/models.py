@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, ForeignKey
+from sqlalchemy import JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # There are no accounts or logins yet, so every row belongs to this one account.
@@ -88,4 +88,50 @@ class FindingRow(Base):
     last_seen_at: Mapped[datetime]
     resolved_at: Mapped[datetime | None]
     resolution_reason: Mapped[str | None]
-    last_scan_id: Mapped[int] = mapped_column(ForeignKey("scans.id"))
+    last_scan_id: Mapped[int | None] = mapped_column(ForeignKey("scans.id"))  # none if imported
+    source: Mapped[str] = mapped_column(default="cloudshield", server_default="cloudshield")
+    import_id: Mapped[int | None]  # the newest import that reported this finding
+    last_imported_at: Mapped[datetime | None]
+    score_basis: Mapped[str] = mapped_column(
+        default="severity only", server_default="severity only"
+    )  # severity only or context adjusted
+    # An imported finding that repeats one of ours points at ours, and is left out of every list.
+    merged_into: Mapped[str | None]
+    tools_disagree: Mapped[bool] = mapped_column(default=False, server_default="0")
+    corroborated_by: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    disposition: Mapped[str] = mapped_column(default="none", server_default="none")
+    disposition_reason: Mapped[str | None]
+    disposition_until: Mapped[datetime | None]
+    disposition_at: Mapped[datetime | None]
+
+
+class ImportRow(Base):
+    __tablename__ = "imports"
+    __table_args__ = (UniqueConstraint("account_id", "file_sha256", name="uq_imports_file"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[str] = mapped_column(default=ACCOUNT_ID, server_default=ACCOUNT_ID)
+    source: Mapped[str]  # prowler
+    file_sha256: Mapped[str]
+    imported_at: Mapped[datetime]
+    external_account_id: Mapped[str | None]  # the account id written in the file
+    counts: Mapped[dict] = mapped_column(JSON)
+    regions_covered: Mapped[list] = mapped_column(JSON)
+    checks_covered: Mapped[list] = mapped_column(JSON)
+    file_name: Mapped[str | None]  # the base name only, never a path
+    tool_name: Mapped[str | None]
+    tool_version: Mapped[str | None]
+    pass_count: Mapped[int | None]
+    fail_count: Mapped[int | None]
+
+
+class PassedCheckRow(Base):
+    __tablename__ = "passed_checks"
+
+    account_id: Mapped[str] = mapped_column(
+        primary_key=True, default=ACCOUNT_ID, server_default=ACCOUNT_ID
+    )
+    check_id: Mapped[str] = mapped_column(primary_key=True)
+    resource_id: Mapped[str] = mapped_column(primary_key=True)
+    region: Mapped[str | None]
+    last_import_id: Mapped[int] = mapped_column(ForeignKey("imports.id"))

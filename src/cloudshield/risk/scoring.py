@@ -85,6 +85,15 @@ def privilege_factor(resource: dict) -> dict | None:
     return factor("privilege", PRIVILEGE_BONUS, reason, "verified")
 
 
+def context_factors(resource: dict, instances: list[dict], ec2_known: bool) -> list[dict]:
+    factors = [
+        exposure_factor(resource),
+        attached_factor(resource, instances, ec2_known),
+        privilege_factor(resource),
+    ]
+    return [f for f in factors if f is not None]
+
+
 def score_findings(findings: list[Finding], result: dict, regions: list[str]) -> list[Finding]:
     resources = {r["resource_id"]: r for r in result["resources"]}
     instances = [r for r in result["resources"] if r["resource_type"] == "EC2"]
@@ -97,12 +106,7 @@ def score_findings(findings: list[Finding], result: dict, regions: list[str]) ->
             continue
         resource = resources[finding.resource_id]
         ec2_known = not ec2_has_errors and resource["region"] in regions
-        factors = [
-            exposure_factor(resource),
-            attached_factor(resource, instances, ec2_known),
-            privilege_factor(resource),
-        ]
-        factors = [f for f in factors if f is not None]
+        factors = context_factors(resource, instances, ec2_known)
         score = BASE_SCORES[finding.severity] + sum(f["adjustment"] for f in factors)
         scored.append(replace(finding, risk_score=min(100, score), risk_factors=factors))
     return scored

@@ -4,7 +4,8 @@ from typing import Literal, get_args
 
 Severity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 FindingStatus = Literal["OPEN", "RESOLVED"]
-Certainty = Literal["verified", "heuristic", "unknown"]
+# "reported" means an external tool, such as Prowler, said so and CloudShield did not check it.
+Certainty = Literal["verified", "heuristic", "unknown", "reported"]
 SEVERITIES = get_args(Severity)
 
 

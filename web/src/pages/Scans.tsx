@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, type ScanOut } from "../api";
 import { Icon } from "../components/Icon";
+import { ImportHistory } from "../components/ImportedSections";
 import { Tooltip } from "../components/Tooltip";
 import {
   AsyncView,
@@ -29,26 +30,29 @@ export function Scans() {
   useRefreshWhenScanEnds(reload);
 
   return (
-    <AsyncView state={state} onRetry={reload} label="Loading scans" shape="table">
-      {(scans) =>
-        scans.length === 0 ? (
-          <>
-            <PageTitle>No scans yet.</PageTitle>
-            <EmptyState title="Nothing to show">
-              Start one with the button at the top.
-            </EmptyState>
-          </>
-        ) : (
-          <>
-            <PageTitle sub="Every scan, newest first.">
-              {plural(scans.length, "scan", "scans")}.
-            </PageTitle>
-            <LatestSummary scan={scans[0]} />
-            <ScansTable scans={scans} />
-          </>
-        )
-      }
-    </AsyncView>
+    <>
+      <AsyncView state={state} onRetry={reload} label="Loading scans" shape="table">
+        {(scans) =>
+          scans.length === 0 ? (
+            <>
+              <PageTitle>No scans yet.</PageTitle>
+              <EmptyState title="Nothing to show">
+                Start one with the button at the top.
+              </EmptyState>
+            </>
+          ) : (
+            <>
+              <PageTitle sub="Every scan, newest first.">
+                {plural(scans.length, "scan", "scans")}.
+              </PageTitle>
+              <LatestSummary scan={scans[0]} />
+              <ScansTable scans={scans} />
+            </>
+          )
+        }
+      </AsyncView>
+      <ImportHistory />
+    </>
   );
 }
 

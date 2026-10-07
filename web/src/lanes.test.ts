@@ -54,7 +54,8 @@ describe("countLanes", () => {
       { status: "RESOLVED", risk_score: 99 },
     ]);
 
-    expect(counts).toEqual({ now: 2, next: 1, later: 1, done: 1 });
+    // A finding with no score is in no lane.
+    expect(counts).toEqual({ now: 2, next: 1, later: 0, done: 1 });
   });
 });
 

@@ -122,11 +122,12 @@ describe("Findings: page", () => {
       "Next",
       "Later",
       "Done",
+      "Dismissed",
       "All",
     ]);
     expect(chip("Fix now", 2)).toHaveAttribute("aria-pressed", "false");
     expect(chip("Next", 1)).toHaveAttribute("aria-pressed", "false");
-    expect(chip("Later", 2)).toHaveAttribute("aria-pressed", "false");
+    expect(chip("Later", 1)).toHaveAttribute("aria-pressed", "false");
     expect(chip("Done", 1)).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -147,12 +148,12 @@ describe("Findings: page", () => {
     expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("puts a finding with no score in Later, and a resolved finding in Done", async () => {
+  it("keeps a finding with no score out of every lane, and a resolved finding in Done", async () => {
     const user = renderApp("/findings", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
-    await user.click(chip("Later", 2));
-    expect(titles()).toEqual(["No versioning", "Default encryption"]);
+    await user.click(chip("Later", 1));
+    expect(titles()).toEqual(["No versioning"]);
     await user.click(chip("Done", 1));
 
     expect(titles()).toEqual(["Fixed finding"]);
@@ -272,7 +273,7 @@ describe("Findings: page", () => {
     const body = screen.getAllByRole("row").slice(1);
 
     expect(FINDINGS_GRID).toContain(
-      "grid-cols-[20px_88px_minmax(0,1fr)_200px_112px_120px_28px]",
+      "grid-cols-[20px_88px_minmax(0,1fr)_240px_112px_120px_28px]",
     );
     expect(header.className).toContain(FINDINGS_GRID);
     expect(body.length).toBe(5);
@@ -441,6 +442,9 @@ describe("applyFilters", () => {
     lane: "all",
     rule: "",
     type: "",
+    source: "",
+    info: "",
+    group: false,
     sort: "risk",
     order: "desc",
   };

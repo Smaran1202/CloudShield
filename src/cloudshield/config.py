@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     embedding_model: str | None = None
     ai_max_calls_per_hour: int = 30
     frontend_origin: str = "http://localhost:5173"
+    # Comma separated names of identities that belong to CloudShield itself, such as its scanner
+    # user. Findings about them are suggested as not applicable, never dismissed automatically.
+    cloudshield_own_identities: str = ""
 
 
 def load_env_file() -> None:

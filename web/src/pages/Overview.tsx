@@ -1,37 +1,27 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import {
-  api,
-  type EvidenceItem,
-  type FindingOut,
-  type RiskSummaryOut,
-  type ScanOut,
-} from "../api";
+import { api, type EvidenceItem, type FindingOut, type ScanOut } from "../api";
 import { CopyButton } from "../components/CopyButton";
 import { Icon } from "../components/Icon";
-import { Tooltip } from "../components/Tooltip";
 import {
   AsyncView,
   Card,
   Check,
   EmptyState,
+  FindingFlags,
   PRIMARY_BUTTON,
   SectionTitle,
   SeverityChip,
   Tag,
   useMountValue,
 } from "../components/ui";
-import {
-  ENVIRONMENT_HELP,
-  formatDate,
-  formatRelative,
-  plural,
-  scanDuration,
-} from "../format";
+import { formatDate, formatRelative, plural, ruleLabel, scanDuration } from "../format";
 import {
   byScoreDescending,
   countLanes,
   highestRiskOpen,
+  inLane as membersOf,
+  isActive,
   LANE_BACKGROUND,
   LANE_EMPTY,
   LANE_HINT,
@@ -96,11 +86,7 @@ function OverviewBody({ scans }: { scans: ScanOut[] }) {
 
 function Board({ scans }: { scans: ScanOut[] }) {
   const [findings, reloadFindings] = useAsync(() => api.findings());
-  const [summary, reloadSummary] = useAsync(() => api.riskSummary());
-  useRefreshWhenScanEnds(() => {
-    reloadFindings();
-    reloadSummary();
-  });
+  useRefreshWhenScanEnds(reloadFindings);
 
   return (
     <div className="space-y-16">
@@ -112,14 +98,14 @@ function Board({ scans }: { scans: ScanOut[] }) {
       >
         {(rows) => <BoardBody rows={rows} scans={scans} />}
       </AsyncView>
-      <LastScanFacts scan={scans[0]} summary={summary} />
+      <LastScanFacts scan={scans[0]} findings={findings} />
     </div>
   );
 }
 
 // "3 verified, 1 unknown": how much of the evidence was read straight from AWS.
 export function certaintySummary(items: EvidenceItem[]): string {
-  const parts = (["verified", "heuristic", "unknown"] as const)
+  const parts = (["verified", "heuristic", "unknown", "reported"] as const)
     .map(
       (kind) => [items.filter((item) => item.certainty === kind).length, kind] as const,
     )
@@ -130,14 +116,23 @@ export function certaintySummary(items: EvidenceItem[]): string {
 
 function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
   const counts = countLanes(rows);
-  const open = rows.filter((r) => r.status === "OPEN");
+  const active = rows.filter(isActive);
+  const toGo = active.filter((r) => r.severity !== "INFO");
+  const informational = active.filter((r) => r.severity === "INFO");
+  const foundHere = toGo.filter((r) => r.source === "cloudshield").length;
+  const imported = toGo.filter((r) => r.source === "prowler").length;
+  const dismissed = rows.filter(
+    (r) => r.status === "OPEN" && r.dismissed && !r.merged_into,
+  ).length;
   const top = highestRiskOpen(rows);
-  const scoredOpen = open.filter((r) => r.risk_score !== null).sort(byScoreDescending);
-  const inLane = (lane: Lane) => scoredOpen.filter((r) => laneOf(r) === lane);
-  const noScore = open.filter((r) => r.risk_score === null);
+  const inLane = (lane: Lane) => membersOf(rows, lane).sort(byScoreDescending);
+  const more = (lane: Lane) => inLane(lane).length > TILES_PER_LANE;
+  const noScore = active.filter((r) => r.risk_score === null);
   const resolved = rows.filter((r) => r.status === "RESOLVED");
   const fallback =
-    open.length > 0 ? "Only informational findings are open." : "Nothing is open.";
+    informational.length > 0
+      ? "Only informational findings are open."
+      : "Nothing is open.";
 
   return (
     <div className="space-y-16">
@@ -148,7 +143,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
         <div>
           <h1 className={HEADLINE}>
             <MaskLine delay={0}>{`${resolved.length} fixed.`}</MaskLine>
-            <MaskLine delay={130}>{`${open.length} to go.`}</MaskLine>
+            <MaskLine delay={130}>{`${toGo.length} to go.`}</MaskLine>
           </h1>
           <p className="rise mt-6 text-h3" style={{ animationDelay: "400ms" }}>
             {top ? (
@@ -166,6 +161,18 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
               fallback
             )}
           </p>
+          <SourceCounts
+            parts={[
+              [
+                foundHere,
+                "found by CloudShield",
+                "/findings?source=cloudshield&info=hide",
+              ],
+              [imported, "imported", "/findings?source=prowler&info=hide"],
+              [informational.length, "informational", "/findings?info=only"],
+              [dismissed, "dismissed", "/findings?lane=dismissed"],
+            ]}
+          />
           <p
             className="rise mt-3 max-w-3xl text-secondary text-dim"
             style={{ animationDelay: "500ms" }}
@@ -180,46 +187,110 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
       </div>
 
       <div className="flex flex-wrap items-start gap-6">
-        <LaneColumn lane="now" count={counts.now} delay={450} pulse={counts.now > 0}>
-          {inLane("now").map((f, i) => (
-            <Tile key={f.finding_id} finding={f} lane="now" index={i} />
-          ))}
+        <LaneColumn
+          lane="now"
+          count={counts.now}
+          delay={450}
+          pulse={counts.now > 0}
+          extra={
+            more("now") ? <SeeAll lane="now" total={inLane("now").length} /> : undefined
+          }
+        >
+          {inLane("now")
+            .slice(0, TILES_PER_LANE)
+            .map((f, i) => (
+              <Tile key={f.finding_id} finding={f} lane="now" index={i} />
+            ))}
         </LaneColumn>
-        <LaneColumn lane="next" count={counts.next} delay={600}>
-          {inLane("next").map((f, i) => (
-            <Tile key={f.finding_id} finding={f} lane="next" index={i} />
-          ))}
+        <LaneColumn
+          lane="next"
+          count={counts.next}
+          delay={600}
+          extra={
+            more("next") ? (
+              <SeeAll lane="next" total={inLane("next").length} />
+            ) : undefined
+          }
+        >
+          {inLane("next")
+            .slice(0, TILES_PER_LANE)
+            .map((f, i) => (
+              <Tile key={f.finding_id} finding={f} lane="next" index={i} />
+            ))}
         </LaneColumn>
         <LaneColumn
           lane="later"
           count={counts.later}
           delay={750}
           extra={
-            noScore.length > 0 && (
-              <li className="rounded-chip border-2 border-dashed border-dash p-4 text-secondary">
-                {noScore.length === 1
-                  ? "1 informational finding with no risk score."
-                  : `${noScore.length} informational findings with no risk score.`}{" "}
-                <Link to="/findings?lane=later" className="font-semibold underline">
-                  See them
-                </Link>
-              </li>
-            )
+            more("later") || noScore.length > 0 ? (
+              <>
+                <SeeAll lane="later" total={inLane("later").length} />
+                {noScore.length > 0 && (
+                  <li className="rounded-chip border-2 border-dashed border-dash p-4 text-secondary">
+                    {noScore.length === 1
+                      ? "1 informational finding with no risk score."
+                      : `${noScore.length} informational findings with no risk score.`}{" "}
+                    <Link to="/findings?info=only" className="font-semibold underline">
+                      See them
+                    </Link>
+                  </li>
+                )}
+              </>
+            ) : undefined
           }
         >
-          {inLane("later").map((f, i) => (
-            <Tile key={f.finding_id} finding={f} lane="later" index={i} />
-          ))}
+          {inLane("later")
+            .slice(0, TILES_PER_LANE)
+            .map((f, i) => (
+              <Tile key={f.finding_id} finding={f} lane="later" index={i} />
+            ))}
         </LaneColumn>
       </div>
 
       <DoneStrip resolved={resolved} />
 
       <div className="grid items-start gap-12 min-[900px]:grid-cols-2">
-        <ProgressCard resolved={resolved} total={rows.length} />
+        <ProgressCard resolved={resolved} total={resolved.length + active.length} />
         <ScansChart scans={scans} />
       </div>
     </div>
+  );
+}
+
+const TILES_PER_LANE = 5;
+
+// "5 found by CloudShield, 2 imported, ...": each part opens the matching Findings filter.
+function SourceCounts({ parts }: { parts: [number, string, string][] }) {
+  return (
+    <p
+      data-testid="source-counts"
+      className="rise mt-3 text-secondary font-semibold"
+      style={{ animationDelay: "450ms" }}
+    >
+      {parts.map(([count, label, to], index) => (
+        <span key={label}>
+          <Link to={to} className="underline underline-offset-4">
+            {count} {label}
+          </Link>
+          {index < parts.length - 1 && ", "}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+// A lane shows its first few tiles. The rest are in the Findings list, filtered to this lane.
+function SeeAll({ lane, total }: { lane: Lane; total: number }) {
+  return (
+    <li>
+      <Link
+        to={`/findings?lane=${lane}`}
+        className="inline-flex min-h-11 items-center gap-2 font-semibold underline"
+      >
+        See all {total} <Icon name="arrow" size={18} />
+      </Link>
+    </li>
   );
 }
 
@@ -335,8 +406,9 @@ function Tile({
         {finding.risk_score}
       </span>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Tag>{finding.rule_id}</Tag>
+        <Tag>{ruleLabel(finding.rule_id)}</Tag>
         <SeverityChip severity={finding.severity} />
+        <FindingFlags finding={finding} />
       </div>
       <h3 className="mt-3 line-clamp-3 font-display text-title leading-tight font-bold">
         <Link
@@ -475,11 +547,12 @@ export function ScansChart({ scans }: { scans: ScanOut[] }) {
 
 function LastScanFacts({
   scan,
-  summary,
+  findings,
 }: {
   scan: ScanOut;
-  summary: ReturnType<typeof useAsync<RiskSummaryOut>>[0];
+  findings: ReturnType<typeof useAsync<FindingOut[]>>[0];
 }) {
+  const highest = findings.status === "success" ? highestRiskOpen(findings.data) : null;
   const facts: [string, string][] = [
     ["Last scan", `Scan ${scan.id}`],
     ["Finished", formatRelative(scan.finished_at)],
@@ -487,6 +560,9 @@ function LastScanFacts({
     ["Resources", String(scan.resource_count)],
     ["Errors", String(scan.error_count)],
   ];
+  if (findings.status === "success") {
+    facts.push(["Highest open risk", highest ? String(highest.risk_score) : "none"]);
+  }
   return (
     <dl className="flex flex-wrap items-end gap-x-12 gap-y-4 border-t border-divider pt-6 text-secondary">
       {facts.map(([label, value]) => (
@@ -500,16 +576,6 @@ function LastScanFacts({
           </dd>
         </div>
       ))}
-      <div>
-        <dt className="text-label text-dim">
-          <Tooltip text={ENVIRONMENT_HELP}>Combined environment score</Tooltip>
-        </dt>
-        <dd className="font-mono text-label">
-          {summary.status === "success" && summary.data.environment_score}
-          {summary.status === "loading" && "..."}
-          {summary.status === "error" && `unavailable: ${summary.message}`}
-        </dd>
-      </div>
     </dl>
   );
 }

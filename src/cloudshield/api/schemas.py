@@ -1,11 +1,20 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, StringConstraints
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    StringConstraints,
+    field_validator,
+)
 
 from cloudshield.findings import Certainty, FindingStatus, Severity
 
 ScanStatus = Literal["queued", "running", "completed", "failed"]
+FindingSource = Literal["cloudshield", "prowler"]
+ScoreBasis = Literal["severity only", "context adjusted"]
+Disposition = Literal["none", "accepted", "not_applicable"]
 BlastLevel = Literal["low", "medium", "high", "unknown"]
 PatchFormat = Literal["terraform", "cloudformation", "cli"]
 Region = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
@@ -75,6 +84,17 @@ class Evidence(BaseModel):
     items: list[EvidenceItem] = []
 
 
+class Corroboration(BaseModel):
+    source: str
+    check_id: str
+    status: Literal["PASS", "FAIL"]
+    last_imported_at: UtcDateTime
+
+
+class SuggestedNotApplicable(BaseModel):
+    reason: str
+
+
 class FindingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -94,7 +114,65 @@ class FindingOut(BaseModel):
     last_seen_at: UtcDateTime
     resolved_at: UtcDateTime | None
     resolution_reason: str | None
-    last_scan_id: int
+    last_scan_id: int | None  # none for an imported finding
+    source: FindingSource
+    last_imported_at: UtcDateTime | None
+    # An open imported finding that the newest import did not mention.
+    not_rechecked: bool = False
+    score_basis: ScoreBasis
+    # Set on an imported finding that repeats one of ours. It is left out of every list.
+    merged_into: str | None
+    # Imported scans that report the same thing as this finding, and what they say.
+    corroborated_by: list[Corroboration]
+    # Our scan and an imported scan give different answers about the same check and resource.
+    tools_disagree: bool
+    # The disposition in force. An expired one is shown as "none", and the finding is open again.
+    disposition: Disposition
+    disposition_reason: str | None
+    disposition_until: UtcDateTime | None
+    disposition_at: UtcDateTime | None
+    dismissed: bool = False
+    # A suggestion only. Nothing is ever dismissed automatically.
+    suggested_not_applicable: SuggestedNotApplicable | None = None
+
+
+class DispositionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    disposition: Literal["accepted", "not_applicable"]
+    disposition_reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=10)]
+    disposition_until: date | None = None  # valid through the end of this day (UTC)
+
+    @field_validator("disposition_until")
+    @classmethod
+    def not_in_the_past(cls, value: date | None) -> date | None:
+        if value is not None and value < datetime.now(UTC).date():
+            raise ValueError("disposition_until must not be in the past")
+        return value
+
+
+class ImportOut(BaseModel):
+    id: int
+    file_name: str | None
+    tool_name: str | None
+    tool_version: str | None
+    imported_at: UtcDateTime
+    pass_count: int | None
+    fail_count: int | None
+    findings_added: int
+    already_seen: int
+    resolved: int
+    rejected: int
+    ignored: int
+    regions_covered: list[str]
+
+
+class ImportedResourceOut(BaseModel):
+    resource_id: str
+    resource_type: str
+    region: str | None
+    open_count: int
+    highest_risk: int | None
 
 
 class RiskSummaryOut(BaseModel):

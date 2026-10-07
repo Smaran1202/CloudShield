@@ -1,7 +1,16 @@
 import { useState, type ReactNode } from "react";
-import type { BlastLevel, Certainty, FindingStatus, ScanStatus, Severity } from "../api";
+import type {
+  BlastLevel,
+  Certainty,
+  FindingOut,
+  FindingSource,
+  FindingStatus,
+  ScanStatus,
+  Severity,
+} from "../api";
+import { formatDate } from "../format";
 import type { AsyncState } from "../useAsync";
-import { Icon } from "./Icon";
+import { Icon, type IconName } from "./Icon";
 
 const CHIP =
   "inline-flex items-center rounded-chip px-3 py-1 text-secondary font-semibold";
@@ -92,23 +101,125 @@ const CERTAINTY_CHIP: Record<Certainty, string> = {
   verified: "bg-chip-ok-bg text-chip-ok-text",
   heuristic: "bg-chip-warn-bg text-chip-warn-text",
   unknown: "bg-chip-unknown-bg text-chip-unknown-text",
+  reported: "bg-chip-info-bg text-chip-info-text",
+};
+
+// Every kind has its own icon, so the meaning is never carried by colour alone.
+const CERTAINTY_ICON: Record<Certainty, IconName> = {
+  verified: "check",
+  heuristic: "alert",
+  unknown: "question",
+  reported: "external",
 };
 
 const CERTAINTY_HELP: Record<Certainty, string> = {
   verified: "Read directly from AWS in a scan",
   heuristic: "A conclusion the scan cannot fully prove",
   unknown: "The data needed was not available",
+  reported: "Reported by an external tool. CloudShield did not check it",
 };
 
 export function CertaintyChip({ certainty }: { certainty: Certainty }) {
   return (
     <span
-      className={`${CHIP} ${CERTAINTY_CHIP[certainty]}`}
+      className={`${CHIP} gap-2 capitalize ${CERTAINTY_CHIP[certainty]}`}
       title={CERTAINTY_HELP[certainty]}
       data-certainty={certainty}
     >
+      <Icon name={CERTAINTY_ICON[certainty]} size={16} />
       {certainty}
     </span>
+  );
+}
+
+// Shown only for findings that came from an import. Our own findings have no badge.
+export function SourceBadge({ source }: { source: FindingSource }) {
+  if (source !== "prowler") return null;
+  return (
+    <span
+      className={`${CHIP} gap-2 border-2 border-ink bg-white text-ink`}
+      title="Imported from an external scanner"
+      data-source={source}
+    >
+      <Icon name="import" size={16} />
+      Imported
+    </span>
+  );
+}
+
+// An open imported finding that the newest import did not mention may be fixed already, or not.
+export function NotRechecked({ finding }: { finding: FindingOut }) {
+  if (!finding.not_rechecked) return null;
+  return (
+    <span className="inline-flex items-center gap-2 text-secondary font-semibold text-dim">
+      <Icon name="alert" size={16} />
+      Not rechecked. Last covered by the import of {formatDate(finding.last_imported_at)}.
+    </span>
+  );
+}
+
+const theirs = { PASS: "passed", FAIL: "failed" } as const;
+
+// Both results, for a finding the two tools do not agree on.
+export function disagreement(finding: FindingOut): string {
+  if (finding.source === "prowler") {
+    return "CloudShield: no open finding. Imported scan: failed.";
+  }
+  const other = finding.corroborated_by[0];
+  const answer = other ? theirs[other.status] : "no result";
+  return `CloudShield: ${finding.status === "OPEN" ? "open" : "not open"}. Imported scan: ${answer}.`;
+}
+
+// The chips that say where a finding came from and how far it can be trusted. They are shown
+// the same way on tiles, rows and the finding page.
+export function FindingFlags({ finding }: { finding: FindingOut }) {
+  const confirmed = finding.corroborated_by.some((c) => c.status === "FAIL");
+  return (
+    <>
+      <SourceBadge source={finding.source} />
+      {confirmed && (
+        <span
+          className={`${CHIP} gap-2 bg-chip-ok-bg text-chip-ok-text`}
+          title="Our scan and an imported scan both report this"
+        >
+          <Icon name="check" size={16} />
+          Confirmed by 2 tools
+        </span>
+      )}
+      {finding.tools_disagree && (
+        <span
+          className={`${CHIP} gap-2 bg-chip-warn-bg text-chip-warn-text`}
+          title={disagreement(finding)}
+        >
+          <Icon name="alert" size={16} />
+          Tools disagree
+        </span>
+      )}
+      {finding.dismissed && (
+        <span className={`${CHIP} gap-2 border-2 border-dashed border-dash text-dim`}>
+          <Icon name="dismiss" size={16} />
+          Dismissed
+        </span>
+      )}
+    </>
+  );
+}
+
+// The longer notes that go with the chips: both results of a disagreement, and the reason
+// something was dismissed.
+export function FindingNotes({ finding }: { finding: FindingOut }) {
+  return (
+    <>
+      {finding.tools_disagree && (
+        <span className="block text-secondary text-dim">{disagreement(finding)}</span>
+      )}
+      {finding.dismissed && (
+        <span className="block text-secondary text-dim">
+          {finding.disposition === "accepted" ? "Accepted" : "Not applicable"}:{" "}
+          {finding.disposition_reason}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -128,9 +239,12 @@ export function LevelChip({ level }: { level: BlastLevel }) {
 }
 
 // Rule ids and similar short labels. This is the only place the 12px size is used.
-export function Tag({ children }: { children: ReactNode }) {
+export function Tag({ children }: { children: string }) {
   return (
-    <span className="inline-block rounded-[4px] border-[1.5px] border-current px-2 py-1 font-mono text-tag">
+    <span
+      title={children}
+      className="inline-block max-w-full truncate rounded-[4px] border-[1.5px] border-current px-2 py-1 align-bottom font-mono text-tag"
+    >
       {children}
     </span>
   );

@@ -7,6 +7,7 @@ export interface Call {
   method: string;
   path: string;
   search: string;
+  body: unknown;
 }
 
 type Answer = unknown;
@@ -62,7 +63,8 @@ export function mockApi(routes: Record<string, Handler>) {
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
       const method = (init?.method ?? "GET").toUpperCase();
-      const call = { method, path: url.pathname, search: url.search };
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : null;
+      const call = { method, path: url.pathname, search: url.search, body };
       calls.push(call);
       const key = `${method} ${url.pathname}`;
       if (!(key in routes)) {

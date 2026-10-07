@@ -32,7 +32,7 @@ def test_alembic_upgrade_head_creates_the_tables_on_a_fresh_database(tmp_path, m
     with engine.connect() as connection:
         version = connection.execute(text("select version_num from alembic_version")).scalar()
     assert {"scans", "resources", "findings", "fixes"} <= tables
-    assert version == "0003"
+    assert version == "0005"
 
 
 def test_migrated_schema_matches_the_models(tmp_path, monkeypatch):

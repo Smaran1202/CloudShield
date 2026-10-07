@@ -6,6 +6,14 @@ export const LANE_THRESHOLDS = { fixNow: 80, next: 60 } as const;
 export type Lane = "now" | "next" | "later" | "done";
 export const LANES: Lane[] = ["now", "next", "later", "done"];
 
+type Placed = Pick<FindingOut, "status" | "risk_score"> &
+  Partial<Pick<FindingOut, "dismissed" | "merged_into">>;
+
+// A finding that still has to be dealt with: open, not dismissed, and not merged into another.
+export function isActive(finding: Placed): boolean {
+  return finding.status === "OPEN" && !finding.dismissed && !finding.merged_into;
+}
+
 // Open findings are placed by risk score. A finding with no score (INFO) goes to Later.
 // A resolved finding is Done, whatever its last score was.
 export function laneOf(finding: Pick<FindingOut, "status" | "risk_score">): Lane {
@@ -59,9 +67,18 @@ export const LANE_BORDER: Record<Lane, string> = {
   done: "border-green",
 };
 
-export function countLanes(findings: Pick<FindingOut, "status" | "risk_score">[]) {
+// The one rule for what is in a lane. The lane counts, the tiles, the "See all" links and the
+// Findings filter all use it, so they always agree. A finding with no score is in no lane.
+export function inLane<T extends Placed>(findings: T[], lane: Lane): T[] {
+  return findings.filter((finding) => {
+    if (lane === "done") return finding.status === "RESOLVED";
+    return isActive(finding) && finding.risk_score !== null && laneOf(finding) === lane;
+  });
+}
+
+export function countLanes(findings: Placed[]) {
   const counts: Record<Lane, number> = { now: 0, next: 0, later: 0, done: 0 };
-  for (const finding of findings) counts[laneOf(finding)] += 1;
+  for (const lane of LANES) counts[lane] = inLane(findings, lane).length;
   return counts;
 }
 
@@ -74,7 +91,7 @@ export function byScoreDescending(a: FindingOut, b: FindingOut): number {
 }
 
 export function highestRiskOpen(findings: FindingOut[]): FindingOut | null {
-  const open = findings.filter((f) => f.status === "OPEN" && f.risk_score !== null);
+  const open = findings.filter((f) => isActive(f) && f.risk_score !== null);
   return [...open].sort(byScoreDescending)[0] ?? null;
 }
 

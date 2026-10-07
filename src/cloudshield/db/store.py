@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 
 from cloudshield.db.models import ACCOUNT_ID, FindingRow, ResourceRow, ScanRow
 from cloudshield.findings import Finding
+from cloudshield.dispositions import counts_toward_open
+from cloudshield.imports.merge import reconcile
+from cloudshield.imports.recheck import resolve_gone_resources
 from cloudshield.risk.environment import environment_score, severity_counts
 
 # The scanner service that has to run without errors before a finding of this type can be
@@ -76,14 +79,17 @@ def save_result(session: Session, scan_id: int, result: dict, findings: list[Fin
     save_resources(session, scan_id, result["resources"])
     save_findings(session, scan_id, findings, now)
     resolve_fixed(session, scan, result, {f.finding_id for f in findings}, now)
-    save_environment_score(session, scan)
+    scan.errors = result["errors"]
     scan.status = "completed"
+    resolve_gone_resources(session, scan, ACCOUNT_ID, now)
+    session.flush()
+    reconcile(session, ACCOUNT_ID)
+    save_environment_score(session, scan)
     scan.progress = "Done"
     scan.finished_at = now
     scan.resource_count = len(result["resources"])
     scan.finding_count = len(findings)
     scan.error_count = len(result["errors"])
-    scan.errors = result["errors"]
     session.commit()
 
 
@@ -118,6 +124,7 @@ def save_findings(session: Session, scan_id: int, findings: list[Finding], now: 
         row.evidence = finding.evidence
         row.risk_score = finding.risk_score
         row.risk_factors = finding.risk_factors
+        row.score_basis = "context adjusted" if finding.risk_factors else "severity only"
         row.status = "OPEN"
         row.resolved_at = None
         row.resolution_reason = None
@@ -129,7 +136,8 @@ def save_environment_score(session: Session, scan: ScanRow) -> None:
     query = select(FindingRow).where(
         FindingRow.account_id == ACCOUNT_ID, FindingRow.status == "OPEN"
     )
-    open_rows = session.scalars(query).all()
+    now = utcnow()
+    open_rows = [r for r in session.scalars(query).all() if counts_toward_open(r, now)]
     scores = [row.risk_score for row in open_rows if row.risk_score is not None]
     scan.environment_score = environment_score(scores)
     scan.severity_counts = severity_counts([row.severity for row in open_rows])
@@ -145,6 +153,7 @@ def resolve_fixed(
     query = select(FindingRow).where(
         FindingRow.account_id == ACCOUNT_ID,
         FindingRow.status == "OPEN",
+        FindingRow.source == "cloudshield",
         FindingRow.finding_id.not_in(list(current_ids)),
     )
     for row in session.scalars(query).all():

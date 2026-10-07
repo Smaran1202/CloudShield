@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { FindingDetailOut, FixOut, PatchOut } from "../api";
 import { pretty } from "../format";
+import { Icon } from "./Icon";
 import type { FixState } from "../useFixRequest";
 import type { Verify } from "../useVerify";
 import {
@@ -38,6 +39,39 @@ function BulletList({ items }: { items: string[] }) {
   );
 }
 
+// An imported fix lists the links the external tool gave as "Reference: <url>". Only web links
+// become links.
+function GuidanceList({ items }: { items: string[] }) {
+  return (
+    <ul className="list-disc space-y-1 pl-6 text-secondary">
+      {items.map((item) => {
+        const url = item.startsWith("Reference: ")
+          ? item.slice("Reference: ".length)
+          : "";
+        return (
+          <li key={item} className="break-words">
+            {/^https?:\/\//.test(url) ? (
+              <>
+                Reference:{" "}
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold underline"
+                >
+                  {url}
+                </a>
+              </>
+            ) : (
+              item
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function FixTab({
   finding,
   fix,
@@ -50,15 +84,28 @@ export function FixTab({
   verify: Verify;
 }) {
   const details = fix.status === "success" ? fix.fix : null;
+  const imported = finding.source === "prowler";
   return (
     <div className="flex flex-wrap items-start gap-8">
       <div className="flex min-w-0 flex-[1_1_580px] flex-col gap-6">
         <Card>
           <SectionTitle>What this fix does</SectionTitle>
+          {imported && (
+            <p className="mt-3 text-secondary font-semibold">
+              No patch for this finding. This is guidance from an imported scan.
+            </p>
+          )}
           <p className="mt-3 rounded-chip bg-notice p-3 text-secondary font-semibold text-ink">
             CloudShield never changes your AWS account. It writes a fix for you to read
             and apply yourself, then you rescan to check that it worked.
           </p>
+          {imported && (
+            <p className="mt-3 flex items-start gap-2 rounded-chip border-2 border-ink p-3 text-secondary font-semibold">
+              <Icon name="external" size={20} className="mt-[2px] shrink-0" />
+              This comes from an external scanner. CloudShield did not collect this
+              evidence.
+            </p>
+          )}
           <div className="mt-6">
             {fix.status === "idle" && (
               <div className="space-y-3">
@@ -81,7 +128,12 @@ export function FixTab({
             {fix.status === "error" && (
               <ErrorBox message={fix.message} onRetry={() => generate(false)} />
             )}
-            {details && <Explanation fix={details} onRegenerate={() => generate(true)} />}
+            {details && (
+              <Explanation
+                fix={details}
+                onRegenerate={imported ? null : () => generate(true)}
+              />
+            )}
           </div>
         </Card>
         {details && details.patches.length > 0 && (
@@ -93,7 +145,7 @@ export function FixTab({
             <p className="mt-2 mb-3 text-secondary text-dim">
               No patch is generated for this finding.
             </p>
-            <BulletList items={details.guidance} />
+            <GuidanceList items={details.guidance} />
           </Card>
         )}
       </div>
@@ -118,7 +170,17 @@ export function FixTab({
             </div>
           </Card>
         )}
-        <VerifyPanel verify={verify} alreadyResolved={finding.status === "RESOLVED"} />
+        {imported ? (
+          <Card>
+            <SectionTitle>Check the fix</SectionTitle>
+            <p className="mt-2 text-secondary">
+              Run the scan again, then import the new file. The finding resolves when the
+              check passes.
+            </p>
+          </Card>
+        ) : (
+          <VerifyPanel verify={verify} alreadyResolved={finding.status === "RESOLVED"} />
+        )}
       </aside>
     </div>
   );
@@ -148,15 +210,23 @@ function ExplanationBadge({ fix }: { fix: FixOut }) {
   );
 }
 
-function Explanation({ fix, onRegenerate }: { fix: FixOut; onRegenerate: () => void }) {
+function Explanation({
+  fix,
+  onRegenerate,
+}: {
+  fix: FixOut;
+  onRegenerate: (() => void) | null;
+}) {
   const { explanation } = fix;
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <ExplanationBadge fix={fix} />
-        <button type="button" className={SECONDARY_BUTTON} onClick={onRegenerate}>
-          Regenerate explanation
-        </button>
+        {onRegenerate && (
+          <button type="button" className={SECONDARY_BUTTON} onClick={onRegenerate}>
+            Regenerate explanation
+          </button>
+        )}
       </div>
       <Block title="Why it matters">
         <p className="text-secondary">{explanation.why_it_matters}</p>

@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { api, type FindingOut, type ResourceOut, type ScanOut } from "../api";
 import { Icon, iconForResource } from "../components/Icon";
+import { ImportedResources } from "../components/ImportedSections";
 import { AsyncView, EmptyState, FIELD, PageTitle, useMountValue } from "../components/ui";
 import { formatDate, formatRelative, plural } from "../format";
 import {
@@ -59,77 +60,80 @@ export function Resources() {
   const [query, setQuery] = useState("");
 
   return (
-    <AsyncView state={state} onRetry={reload} label="Loading resources" shape="table">
-      {({ resources, findings }) => {
-        if (resources.length === 0) {
+    <>
+      <AsyncView state={state} onRetry={reload} label="Loading resources" shape="table">
+        {({ resources, findings }) => {
+          if (resources.length === 0) {
+            return (
+              <>
+                <PageTitle>No resources yet.</PageTitle>
+                <EmptyState title="Nothing to show">
+                  Run a scan with the button at the top to collect them.
+                </EmptyState>
+              </>
+            );
+          }
+          const types = [...new Set(resources.map((r) => r.resource_type))].sort();
+          const needle = query.trim().toLowerCase();
+          const all = rowData(resources, findings, scanList);
+          const visible = all.filter(
+            ({ resource: r }) =>
+              (!type || r.resource_type === type) &&
+              (!needle || `${r.name} ${r.resource_id}`.toLowerCase().includes(needle)),
+          );
           return (
             <>
-              <PageTitle>No resources yet.</PageTitle>
-              <EmptyState title="Nothing to show">
-                Run a scan with the button at the top to collect them.
-              </EmptyState>
+              <PageTitle sub="The latest known state of what the scanner found in your account.">
+                {plural(resources.length, "resource", "resources")}.
+              </PageTitle>
+              <div
+                className="mb-6 flex flex-wrap gap-2"
+                role="group"
+                aria-label="Resource type"
+              >
+                <TypeChip
+                  label="All"
+                  count={resources.length}
+                  pressed={type === ""}
+                  onClick={() => setType("")}
+                />
+                {types.map((t) => (
+                  <TypeChip
+                    key={t}
+                    label={t}
+                    icon={<Icon name={iconForResource(t)} size={18} />}
+                    count={resources.filter((r) => r.resource_type === t).length}
+                    pressed={type === t}
+                    onClick={() => setType(t)}
+                  />
+                ))}
+              </div>
+              <div className="mb-8 flex flex-wrap items-end gap-4">
+                <label className="flex flex-col gap-1 text-label font-semibold">
+                  Search
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name or id"
+                    className={`${FIELD} min-w-[240px]`}
+                  />
+                </label>
+              </div>
+              <p role="status" className="mb-2 text-secondary text-dim">
+                Showing {visible.length} of {resources.length} resources
+              </p>
+              {visible.length === 0 ? (
+                <EmptyState title="No resources match these filters" />
+              ) : (
+                <ResourceTable rows={visible} />
+              )}
             </>
           );
-        }
-        const types = [...new Set(resources.map((r) => r.resource_type))].sort();
-        const needle = query.trim().toLowerCase();
-        const all = rowData(resources, findings, scanList);
-        const visible = all.filter(
-          ({ resource: r }) =>
-            (!type || r.resource_type === type) &&
-            (!needle || `${r.name} ${r.resource_id}`.toLowerCase().includes(needle)),
-        );
-        return (
-          <>
-            <PageTitle sub="The latest known state of what the scanner found in your account.">
-              {plural(resources.length, "resource", "resources")}.
-            </PageTitle>
-            <div
-              className="mb-6 flex flex-wrap gap-2"
-              role="group"
-              aria-label="Resource type"
-            >
-              <TypeChip
-                label="All"
-                count={resources.length}
-                pressed={type === ""}
-                onClick={() => setType("")}
-              />
-              {types.map((t) => (
-                <TypeChip
-                  key={t}
-                  label={t}
-                  icon={<Icon name={iconForResource(t)} size={18} />}
-                  count={resources.filter((r) => r.resource_type === t).length}
-                  pressed={type === t}
-                  onClick={() => setType(t)}
-                />
-              ))}
-            </div>
-            <div className="mb-8 flex flex-wrap items-end gap-4">
-              <label className="flex flex-col gap-1 text-label font-semibold">
-                Search
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Name or id"
-                  className={`${FIELD} min-w-[240px]`}
-                />
-              </label>
-            </div>
-            <p role="status" className="mb-2 text-secondary text-dim">
-              Showing {visible.length} of {resources.length} resources
-            </p>
-            {visible.length === 0 ? (
-              <EmptyState title="No resources match these filters" />
-            ) : (
-              <ResourceTable rows={visible} />
-            )}
-          </>
-        );
-      }}
-    </AsyncView>
+        }}
+      </AsyncView>
+      <ImportedResources />
+    </>
   );
 }
 

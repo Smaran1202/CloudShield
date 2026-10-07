@@ -11,6 +11,7 @@ from cloudshield.db.models import ACCOUNT_ID, FindingRow, FixRow, ResourceRow
 from cloudshield.db.store import utcnow
 from cloudshield.fixes.blast import blast_radius
 from cloudshield.fixes.explain import HourlyLimit, explain_fix, load_knowledge
+from cloudshield.fixes.imported import make_imported_fix
 from cloudshield.fixes.templates import build_fix
 
 
@@ -65,6 +66,8 @@ def make_fix(
     transport: httpx.BaseTransport | None = None,
     refresh: bool = False,
 ) -> FixRow:
+    if finding_row.source == "prowler":
+        return make_imported_fix(session, finding_row)
     resource_row = session.get(ResourceRow, (ACCOUNT_ID, finding_row.resource_id))
     if resource_row is None:
         raise LookupError("The resource for this finding is not stored, so no fix can be built.")

@@ -7,6 +7,7 @@ import { assertNoUnmockedRequests, resetApiMock } from "./mockApi";
 beforeEach(() => {
   config.scanPollMs = 5;
   config.healthPollMs = 60_000;
+  config.healthRetryMs = 5;
   resetApiMock();
   document.documentElement.classList.remove("dark");
   window.localStorage.clear();

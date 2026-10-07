@@ -105,6 +105,18 @@ cd web
 npm test
 ```
 
+## Import Prowler findings
+
+Run Prowler yourself with JSON-OCSF output, then import the file:
+
+```powershell
+python -m alembic upgrade head
+python -m cloudshield.imports prowler path\to\prowler-output.ocsf.json
+```
+
+Imported findings are marked with their source, and their evidence is labelled "reported". See
+`docs/limitations.md` and `docs/third-party.md`.
+
 ## Checks
 
 From the repository root, with the virtual environment active:

@@ -86,3 +86,63 @@
   can be detected. See `ai-data.md`.
 - The hourly AI limit is counted in the memory of one server process and starts again when the
   server restarts.
+
+## Imported findings (Prowler)
+
+- Imported findings come from an output file that you produce. CloudShield did not collect the
+  evidence, so every evidence item built from Prowler's text has the certainty "reported", and
+  imported findings never show "verified".
+- Only Prowler 5.44.0 output (JSON-OCSF, OCSF 1.5.0) has been checked, using one redacted sample
+  with s3, ec2 and iam checks in `ap-southeast-2`. Other versions are accepted if their OCSF major
+  version is 1, but their fields have not been checked.
+- The base score comes from the severity alone (CRITICAL 90, HIGH 70, MEDIUM 40, LOW 20). Our own
+  context (exposure, attachment, privilege) is added only when the same resource id is in our own
+  scanned resources. Otherwise the finding has one risk factor, "context not available for
+  imported findings", with adjustment 0 and certainty unknown. The lanes are unchanged, so an
+  imported HIGH finding scores 70 and lands in Next unless our own context raises it. Imported
+  INFO findings have no score. The score is worked out at import time and is not refreshed by a
+  later scan.
+- Resources are matched only for S3 buckets, security groups, EC2 instances, IAM policies and IAM
+  roles. Account-level findings (the account, the root user, the password policy) get the type
+  "Account" and are never matched.
+- A finding is resolved only when a newer import shows the same check and resource as PASS.
+  A finding that a newer import does not mention stays open and is labelled "not rechecked", with
+  the date of the last import that covered it. The one exception is a resource our own latest
+  completed scan, with no errors for that service, no longer finds. That resolves it with the
+  reason "resource no longer exists". It is never applied to IAM roles, to policies owned by AWS,
+  to a resource we never scanned, or to a security group in a region that scan did not cover.
+- Imported findings have no patch templates and no AI explanation. The blast radius is always
+  unknown. The fix view shows Prowler's remediation text and links.
+- The title of an imported failure is the scanner's own failing statement, or "Failed: " and the
+  check's title when there is none. The check's own title describes the passing state, so it is
+  kept only in the details. All evidence from an import has the certainty "reported" and the
+  source "imported scan output".
+- Only two checks are treated as the same as one of our rules (see `imports/mapping.py`):
+  `s3_bucket_level_public_access_block` with CIS-S3-001 and `s3_bucket_object_versioning` with
+  CIS-S3-003. When both fail on the same resource, our finding stays and the imported one is
+  merged into it: it is left out of every list, count and score, and ours shows "corroborated by"
+  and an extra "also reported by an imported scan" evidence item. When the two disagree, both
+  stay visible and are flagged `tools_disagree`. Our scan counts as "passing" when it stored the
+  resource and has no open finding for the rule. When our side has no data, the two results are
+  never compared: that is when the resource lacks the attribute the rule needs (the call that
+  reads it failed), or when our latest completed scan reported an error for that service. Then
+  nothing is merged or flagged, both findings stay, and each gets the evidence item "CloudShield
+  could not read this setting, so the two results are not compared." The comparison is made
+  again after the next scan that reads the setting. Partial matches, such as the IAM wildcard check, never merge. Every other pair of
+  imported and own findings is shown twice, each with its source.
+- A finding can be dismissed as accepted or not applicable, with a reason of at least 10
+  characters and an optional end date (valid through the end of that day, UTC). It then leaves
+  the lanes, the headline counts and the risk summary, and stays in the list with its reason. An
+  expired disposition makes the finding open again. The environment score stored on a scan is
+  fixed when the scan finishes, so a later dismissal changes it only in the live risk summary.
+- CloudShield only suggests "not applicable" (AWS-managed policies, service-linked roles, and
+  names in `CLOUDSHIELD_OWN_IDENTITIES`). It never dismisses anything by itself.
+- `score_basis` says whether a score used our own context ("context adjusted") or the severity
+  only. A security group and a policy are scored with context only when the same resource id is
+  in our own scanned resources.
+- Imported resources that we did not scan are listed at `GET /api/resources/imported`, separately
+  from `GET /api/resources`.
+- Each import keeps its file's base name, the tool name and version from the file, and its pass
+  and fail counts. Imports made before this was added show these as empty.
+- A file is identified by its SHA-256. The same file is refused for the same account id, but a
+  file with one extra space is a different file.

@@ -4,7 +4,11 @@ export const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost
 
 export type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO";
 export type FindingStatus = "OPEN" | "RESOLVED";
-export type Certainty = "verified" | "heuristic" | "unknown";
+// "reported" means an external tool said so and CloudShield did not check it.
+export type Certainty = "verified" | "heuristic" | "unknown" | "reported";
+export type FindingSource = "cloudshield" | "prowler";
+export type ScoreBasis = "severity only" | "context adjusted";
+export type Disposition = "none" | "accepted" | "not_applicable";
 export type ScanStatus = "queued" | "running" | "completed" | "failed";
 export type BlastLevel = "low" | "medium" | "high" | "unknown";
 export type PatchFormat = "terraform" | "cloudformation" | "cli";
@@ -62,6 +66,13 @@ export interface Evidence {
   items: EvidenceItem[];
 }
 
+export interface Corroboration {
+  source: string;
+  check_id: string;
+  status: "PASS" | "FAIL";
+  last_imported_at: string;
+}
+
 export interface FindingOut {
   finding_id: string;
   rule_id: string;
@@ -79,7 +90,20 @@ export interface FindingOut {
   last_seen_at: string;
   resolved_at: string | null;
   resolution_reason: string | null;
-  last_scan_id: number;
+  last_scan_id: number | null;
+  source: FindingSource;
+  last_imported_at: string | null;
+  not_rechecked: boolean;
+  score_basis: ScoreBasis;
+  merged_into: string | null;
+  corroborated_by: Corroboration[];
+  tools_disagree: boolean;
+  disposition: Disposition;
+  disposition_reason: string | null;
+  disposition_until: string | null;
+  disposition_at: string | null;
+  dismissed: boolean;
+  suggested_not_applicable: { reason: string } | null;
 }
 
 export interface FindingDetailOut extends FindingOut {
@@ -144,6 +168,36 @@ export interface FixOut {
   created_at: string;
 }
 
+export interface DispositionBody {
+  disposition: "accepted" | "not_applicable";
+  disposition_reason: string;
+  disposition_until: string | null;
+}
+
+export interface ImportOut {
+  id: number;
+  file_name: string | null;
+  tool_name: string | null;
+  tool_version: string | null;
+  imported_at: string;
+  pass_count: number | null;
+  fail_count: number | null;
+  findings_added: number;
+  already_seen: number;
+  resolved: number;
+  rejected: number;
+  ignored: number;
+  regions_covered: string[];
+}
+
+export interface ImportedResourceOut {
+  resource_id: string;
+  resource_type: string;
+  region: string | null;
+  open_count: number;
+  highest_risk: number | null;
+}
+
 export interface HealthOut {
   status: string;
   version: string;
@@ -189,7 +243,19 @@ export const api = {
   scan: (id: number) => request<ScanOut>(`/api/scans/${id}`),
   startScan: () => request<ScanOut>("/api/scans", { method: "POST" }),
   resources: () => request<ResourceOut[]>("/api/resources"),
+  importedResources: () => request<ImportedResourceOut[]>("/api/resources/imported"),
+  imports: () => request<ImportOut[]>("/api/imports"),
   findings: () => request<FindingOut[]>("/api/findings"),
+  dismiss: (id: string, body: DispositionBody) =>
+    request<FindingOut>(`/api/findings/${encodeURIComponent(id)}/disposition`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  undismiss: (id: string) =>
+    request<FindingOut>(`/api/findings/${encodeURIComponent(id)}/disposition`, {
+      method: "DELETE",
+    }),
   finding: (id: string) =>
     request<FindingDetailOut>(`/api/findings/${encodeURIComponent(id)}`),
   riskSummary: () => request<RiskSummaryOut>("/api/risk/summary"),

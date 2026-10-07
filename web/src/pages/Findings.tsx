@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, SEVERITIES, type FindingOut } from "../api";
 import { Icon } from "../components/Icon";
@@ -6,15 +7,20 @@ import {
   EmptyState,
   FIELD,
   PageTitle,
+  FindingFlags,
+  FindingNotes,
+  NotRechecked,
   SelectField,
   statusText,
   Tag,
   useMountValue,
 } from "../components/ui";
-import { formatDate, formatRelative, plural, ruleOptions } from "../format";
+import { formatDate, formatRelative, plural, ruleLabel, ruleOptions } from "../format";
 import {
   byScoreDescending,
   countLanes,
+  inLane,
+  isActive,
   LANE_DOT,
   LANE_NAME,
   LANES,
@@ -28,14 +34,17 @@ import { useAsync } from "../useAsync";
 // The header and every row use this one definition, so the columns always line up:
 // lane dot, Risk, Finding, Rule, Status, Last seen, arrow.
 export const FINDINGS_GRID =
-  "grid grid-cols-[20px_88px_minmax(0,1fr)_200px_112px_120px_28px] items-center gap-4";
+  "grid grid-cols-[20px_88px_minmax(0,1fr)_240px_112px_120px_28px] items-center gap-4";
 
 export interface Filters {
   q: string;
   severity: string;
-  lane: Lane | "open" | "all";
+  lane: Lane | "open" | "dismissed" | "all";
+  info: "" | "hide" | "only";
+  group: boolean;
   rule: string;
   type: string;
+  source: string;
   sort: "risk" | "seen";
   order: "desc" | "asc";
 }
@@ -45,28 +54,42 @@ function readFilters(params: URLSearchParams): Filters {
   return {
     q: params.get("q") ?? "",
     severity: params.get("severity") ?? "",
-    lane: LANES.includes(lane as Lane) ? (lane as Lane) : lane === "all" ? "all" : "open",
+    lane: LANES.includes(lane as Lane)
+      ? (lane as Lane)
+      : lane === "all" || lane === "dismissed"
+        ? lane
+        : "open",
+    info:
+      params.get("info") === "hide" || params.get("info") === "only"
+        ? (params.get("info") as "hide" | "only")
+        : "",
+    group: params.get("group") === "check",
     rule: params.get("rule") ?? "",
     type: params.get("type") ?? "",
+    source: params.get("source") ?? "",
     sort: params.get("sort") === "seen" ? "seen" : "risk",
     order: params.get("order") === "asc" ? "asc" : "desc",
   };
 }
 
+// The lanes use the shared rule in lanes.ts, so a count and the list behind it always agree.
+function inChosenLane(row: FindingOut, lane: Filters["lane"]): boolean {
+  if (lane === "all") return true;
+  if (lane === "open") return isActive(row);
+  if (lane === "dismissed") return row.status === "OPEN" && row.dismissed;
+  return inLane([row], lane).length === 1;
+}
+
 export function applyFilters(rows: FindingOut[], filters: Filters): FindingOut[] {
   const needle = filters.q.trim().toLowerCase();
   const matching = rows.filter((row) => {
-    if (filters.lane === "open" && row.status !== "OPEN") return false;
-    if (
-      filters.lane !== "all" &&
-      filters.lane !== "open" &&
-      laneOf(row) !== filters.lane
-    ) {
-      return false;
-    }
+    if (!inChosenLane(row, filters.lane)) return false;
+    if (filters.info === "hide" && row.severity === "INFO") return false;
+    if (filters.info === "only" && row.severity !== "INFO") return false;
     if (filters.severity && row.severity !== filters.severity) return false;
     if (filters.rule && row.rule_id !== filters.rule) return false;
     if (filters.type && row.resource_type !== filters.type) return false;
+    if (filters.source && row.source !== filters.source) return false;
     if (!needle) return true;
     const text = [
       row.title,
@@ -146,7 +169,8 @@ export function Findings() {
           );
         }
         const counts = countLanes(rows);
-        const open = rows.length - counts.done;
+        const open = rows.filter(isActive).length;
+        const dismissed = rows.filter((r) => inChosenLane(r, "dismissed")).length;
         const visible = applyFilters(rows, filters);
         const types = [...new Set(rows.map((r) => r.resource_type))].sort();
         return (
@@ -174,6 +198,12 @@ export function Findings() {
                   onClick={() => change("lane", lane)}
                 />
               ))}
+              <LaneChip
+                label="Dismissed"
+                count={dismissed}
+                pressed={filters.lane === "dismissed"}
+                onClick={() => change("lane", "dismissed")}
+              />
               <LaneChip
                 label="All"
                 count={rows.length}
@@ -212,6 +242,26 @@ export function Findings() {
                 ]}
               />
               <SelectField
+                label="Source"
+                value={filters.source}
+                onChange={(v) => change("source", v)}
+                options={[
+                  ["", "All sources"],
+                  ["cloudshield", "CloudShield"],
+                  ["prowler", "Imported"],
+                ]}
+              />
+              <SelectField
+                label="Informational"
+                value={filters.info}
+                onChange={(v) => change("info", v)}
+                options={[
+                  ["", "Included"],
+                  ["hide", "Hidden"],
+                  ["only", "Only informational"],
+                ]}
+              />
+              <SelectField
                 label="Resource type"
                 value={filters.type}
                 onChange={(v) => change("type", v)}
@@ -222,6 +272,14 @@ export function Findings() {
               />
             </div>
 
+            <button
+              type="button"
+              aria-pressed={filters.group}
+              onClick={() => change("group", filters.group ? "" : "check")}
+              className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-chip border-2 border-ink px-4 text-secondary font-semibold aria-pressed:bg-ink aria-pressed:text-white"
+            >
+              Group by check
+            </button>
             <p
               role="status"
               className="mb-2 flex flex-wrap items-center gap-4 text-secondary text-dim"
@@ -334,8 +392,8 @@ function FindingsTable({
           data-testid="findings-header"
           className={`${FINDINGS_GRID} sticky top-0 z-10 border-b border-ink bg-white px-4`}
         >
-          <span role="columnheader" className="sr-only">
-            Lane
+          <span role="columnheader">
+            <span className="sr-only">Lane</span>
           </span>
           <SortHeader label="Risk" sort="risk" filters={filters} onSort={onSort} />
           <span role="columnheader" className="text-label font-semibold">
@@ -348,14 +406,100 @@ function FindingsTable({
             Status
           </span>
           <SortHeader label="Last seen" sort="seen" filters={filters} onSort={onSort} />
-          <span role="columnheader" className="sr-only">
-            Open
+          <span role="columnheader">
+            <span className="sr-only">Open</span>
           </span>
         </div>
-        {rows.map((row, index) => (
-          <Row key={row.finding_id} row={row} index={index} />
-        ))}
+        {filters.group
+          ? groupByCheck(rows).map((items, index) =>
+              items.length === 1 ? (
+                <Row key={items[0].finding_id} row={items[0]} index={index} />
+              ) : (
+                <GroupRow key={items[0].rule_id} items={items} index={index} />
+              ),
+            )
+          : rows.map((row, index) => (
+              <Row key={row.finding_id} row={row} index={index} />
+            ))}
       </div>
+    </div>
+  );
+}
+
+// Findings of the same check, in the order they were already sorted.
+function groupByCheck(rows: FindingOut[]): FindingOut[][] {
+  const groups = new Map<string, FindingOut[]>();
+  for (const row of rows)
+    groups.set(row.rule_id, [...(groups.get(row.rule_id) ?? []), row]);
+  return [...groups.values()];
+}
+
+function checkTitle(row: FindingOut): string {
+  const own = row.details.check_title;
+  return typeof own === "string" && own ? own : row.title;
+}
+
+function GroupRow({ items, index }: { items: FindingOut[]; index: number }) {
+  const [open, setOpen] = useState(false);
+  const first = items[0];
+  const openCount = items.filter(isActive).length;
+  const newest = items
+    .map((r) => r.last_seen_at)
+    .sort()
+    .reverse()[0];
+  const label = ruleLabel(first.rule_id);
+  return (
+    <div>
+      <div
+        role="row"
+        data-group={first.rule_id}
+        className={`board-row ${FINDINGS_GRID} border-t border-divider px-4 py-3 first:border-t-0`}
+      >
+        <span role="cell">
+          <span
+            aria-hidden="true"
+            className={`block h-3 w-3 rounded-full ${LANE_DOT[laneOf(first)]}`}
+          />
+        </span>
+        <span
+          role="cell"
+          className="font-display text-score-row leading-none font-extrabold tabular-nums"
+        >
+          {first.risk_score ?? "-"}
+        </span>
+        <span role="cell" className="min-w-0">
+          <span className="block font-display text-title leading-tight font-bold">
+            {checkTitle(first)}
+          </span>
+          <span className="block text-secondary text-dim">
+            {plural(items.length, "resource", "resources")}
+          </span>
+        </span>
+        <span role="cell" className="min-w-0">
+          <Tag>{label}</Tag>
+        </span>
+        <span role="cell" className="text-secondary font-semibold">
+          {openCount} open
+        </span>
+        <span role="cell" className="text-secondary" title={formatDate(newest)}>
+          {formatRelative(newest)}
+        </span>
+        <span role="cell">
+          <button
+            type="button"
+            aria-expanded={open}
+            aria-label={`${open ? "Hide" : "Show"} the ${items.length} resources for ${label}`}
+            onClick={() => setOpen(!open)}
+            className="inline-flex h-11 w-7 items-center justify-center"
+          >
+            <Icon name="chevron" size={20} className={open ? "rotate-180" : ""} />
+          </button>
+        </span>
+      </div>
+      {open &&
+        items.map((row, position) => (
+          <Row key={row.finding_id} row={row} index={index + position} />
+        ))}
     </div>
   );
 }
@@ -394,9 +538,14 @@ function Row({ row, index }: { row: FindingOut; index: number }) {
         <span className="block truncate font-mono text-label" title={row.resource_id}>
           {shortResource(row.resource_id)}
         </span>
+        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 empty:hidden">
+          <FindingFlags finding={row} />
+          <NotRechecked finding={row} />
+        </span>
+        <FindingNotes finding={row} />
       </span>
-      <span role="cell">
-        <Tag>{row.rule_id}</Tag>
+      <span role="cell" className="min-w-0">
+        <Tag>{ruleLabel(row.rule_id)}</Tag>
       </span>
       <span role="cell" className="text-secondary font-semibold">
         {statusText(row.status)}

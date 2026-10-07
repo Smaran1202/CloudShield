@@ -22,16 +22,35 @@ function ApiStatus() {
 
   useEffect(() => {
     let current = true;
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    // One failed check is not enough to say the API is offline: it must fail twice in a row.
+    // A single success brings it back at once.
     const check = () =>
-      api.health().then(
-        (result) => current && setHealth({ state: "online", version: result.version }),
-        () => current && setHealth({ state: "offline" }),
-      );
+      api
+        .health()
+        .then(
+          (result) => {
+            failures = 0;
+            if (current) setHealth({ state: "online", version: result.version });
+          },
+          () => {
+            failures += 1;
+            if (current && failures >= 2) setHealth({ state: "offline" });
+          },
+        )
+        .finally(() => {
+          if (current) {
+            timer = setTimeout(
+              check,
+              failures > 0 ? config.healthRetryMs : config.healthPollMs,
+            );
+          }
+        });
     check();
-    const timer = setInterval(check, config.healthPollMs);
     return () => {
       current = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, []);
 
