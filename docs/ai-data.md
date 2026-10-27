@@ -1,8 +1,8 @@
 # What is sent to the AI model
 
 CloudShield can ask a Gemini model to explain a fix in plain language. The explanation is optional.
-It never creates the fix: the patches, the pre-checks, the rollback and the blast radius are built
-by fixed templates from stored scan data. The model only writes text around them.
+It never creates the fix: the patches, the pre-checks, the rollback and the list of what was not
+checked are built by fixed templates from stored scan data. The model only writes text around them.
 
 ## When nothing is sent
 
@@ -19,8 +19,8 @@ One HTTPS request per attempt to `generativelanguage.googleapis.com`, with the A
 `x-goog-api-key` header (never in the URL). The request contains exactly:
 
 1. A fixed system instruction: explain only from the given data, write no code, name no resource,
-   address range or port that is not in the data, cite evidence ids, and never call an unknown
-   blast radius safe.
+   address range or port that is not in the data, cite evidence ids, say what CloudShield did
+   not check, and never call a change safe.
 2. The knowledge document for the rule (`src/cloudshield/ai/knowledge/<rule_id>.md`), written for
    this project. It describes the rule in general and contains no data from your account.
 3. A JSON object with:
@@ -29,11 +29,12 @@ One HTTPS request per attempt to `generativelanguage.googleapis.com`, with the A
    - `evidence`: the evidence items of the finding, numbered `e1`, `e2`, ... Each has the fact, its
      value, the field it came from and its certainty. For IAM findings these are the matched
      statements and actions, never a whole policy document.
-   - `blast_radius`: the level, its factors and notes. This can include the names of the users,
-     roles and groups a policy is attached to, and the ids of the running instances that use a
-     security group.
+   - `pre_checks`: the fixed checks to make before applying the fix.
+   - `not_checked`: what CloudShield does not look at for this rule, such as website hosting.
    - `patches`: the text of the generated patches, including any JSON files.
    - `guidance`: the review steps for findings that have no patch.
+   An answer is rejected, and the fixed template text is used, if it calls a change safe, harmless
+   or low risk, or if `what_could_break` does not say what was not checked.
 4. The response format: a JSON schema with `why_it_matters`, `what_changes`, `what_could_break` and
    `cited`.
 

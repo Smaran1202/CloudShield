@@ -26,6 +26,12 @@ def clean_environment(monkeypatch):
         "GEMINI_FALLBACK_MODEL",
         "AI_MAX_CALLS_PER_HOUR",
         "CLOUDSHIELD_OWN_IDENTITIES",
+        "PROWLER_PYTHON",
+        "PROWLER_COMMAND",
+        "PROWLER_SERVICES",
+        "PROWLER_TIMEOUT_SECONDS",
+        "CLOUDSHIELD_DATA_DIR",
+        "KEEP_RAW_OUTPUT",
         "AWS_PROFILE",
         "AWS_REGION",
     ]

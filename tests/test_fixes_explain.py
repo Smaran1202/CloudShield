@@ -6,7 +6,6 @@ import pytest
 
 from cloudshield.config import Settings
 from cloudshield.fixes import explain
-from cloudshield.fixes.blast import blast_radius
 from cloudshield.fixes.explain import (
     HourlyLimit,
     build_payload,
@@ -15,13 +14,15 @@ from cloudshield.fixes.explain import (
     redact,
     template_explanation,
 )
-from cloudshield.fixes.templates import build_fix
+from cloudshield.fixes.templates import NOT_CHECKED, build_fix
 from cloudshield.rules.evidence import build_evidence
 
 GOOD = {
     "why_it_matters": "Anyone on the internet can try to reach the SSH port of this group.",
     "what_changes": "The open rule is removed from the group.",
-    "what_could_break": "People who connect through the rule lose access. Who connects is unknown.",
+    "what_could_break": (
+        "People who connect through the rule lose access. CloudShield did not check who connects."
+    ),
     "cited": ["e1"],
 }
 
@@ -64,9 +65,10 @@ def context() -> dict:
     return {
         "finding": finding,
         "knowledge": load_knowledge("CIS-SG-001"),
-        "blast_radius": blast_radius(finding, resource, []),
         "patches": parts["patches"],
         "guidance": parts["guidance"],
+        "pre_checks": parts["pre_checks"],
+        "not_checked": NOT_CHECKED["CIS-SG-001"],
     }
 
 
@@ -139,7 +141,7 @@ def test_request_uses_the_configured_model_a_header_key_and_a_json_schema(sleeps
     assert "do not write code" in body["systemInstruction"]["parts"][0]["text"].lower()
 
 
-def test_prompt_has_the_knowledge_evidence_ids_blast_radius_and_patch_text(sleeps):
+def test_prompt_has_the_knowledge_evidence_ids_pre_checks_and_patch_text(sleeps):
     transport, requests = transport_returning(reply(GOOD))
 
     run(transport)
@@ -147,7 +149,9 @@ def test_prompt_has_the_knowledge_evidence_ids_blast_radius_and_patch_text(sleep
     prompt = json.loads(requests[0].content)["contents"][0]["parts"][0]["text"]
     assert "Security group allows SSH or all traffic from the internet" in prompt
     assert '"id": "e1"' in prompt
-    assert '"blast_radius"' in prompt
+    assert '"pre_checks"' in prompt
+    assert '"not_checked"' in prompt
+    assert "blast" not in prompt.lower()
     assert "aws ec2 revoke-security-group-ingress --group-id sg-0abc123" in prompt
     assert "What the rule checks" in prompt
 
@@ -156,7 +160,8 @@ def test_payload_contains_only_the_allowed_sections():
     assert set(build_payload(context())) == {
         "finding",
         "evidence",
-        "blast_radius",
+        "pre_checks",
+        "not_checked",
         "patches",
         "guidance",
     }
@@ -389,7 +394,10 @@ def test_template_explanation_uses_only_known_facts():
 
     assert "sg-0abc123" in result["why_it_matters"]
     assert "terraform, cloudformation, cli" in result["what_changes"]
-    assert result["what_could_break"].startswith("Blast radius: unknown.")
+    assert "CloudShield did not check:" in result["what_could_break"]
+    for item in NOT_CHECKED["CIS-SG-001"]:
+        assert item in result["what_could_break"]
+    assert "blast" not in str(result).lower()
     assert result["cited"] == ["e1"]
 
 
@@ -556,3 +564,38 @@ def test_the_skipped_reason_carries_googles_message_for_a_failed_call(sleeps):
         "(last: HTTP 400 INVALID_ARGUMENT: Invalid JSON payload received. on model-a); "
         "see the server log"
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "This change is safe. CloudShield did not check who connects.",
+        "The change is harmless. CloudShield did not check who connects.",
+        "Risk is low risk here. CloudShield did not check who connects.",
+        "There is no risk. CloudShield did not check who connects.",
+    ],
+)
+def test_guard_rejects_an_answer_that_calls_a_change_safe(text, sleeps):
+    transport, requests = transport_returning(reply({**GOOD, "what_could_break": text}))
+
+    result = run(transport)
+
+    assert result["generated_by"] == "template"
+    assert "calls a change safe" in result["explanation"]["skipped_reason"]
+
+
+def test_guard_rejects_an_answer_that_does_not_say_what_was_not_checked(sleeps):
+    bad = {**GOOD, "what_could_break": "People who connect through the rule lose access."}
+    transport, requests = transport_returning(reply(bad))
+
+    result = run(transport)
+
+    assert result["generated_by"] == "template"
+    assert "does not say what was not checked" in result["explanation"]["skipped_reason"]
+
+
+def test_guard_accepts_an_answer_that_names_what_was_not_checked(sleeps):
+    fine = {**GOOD, "what_could_break": "Access may stop. It was not checked who connects."}
+    transport, requests = transport_returning(reply(fine))
+
+    assert run(transport)["generated_by"] == "gemini"

@@ -16,6 +16,15 @@ class Settings(BaseSettings):
     # Comma separated names of identities that belong to CloudShield itself, such as its scanner
     # user. Findings about them are suggested as not applicable, never dismissed automatically.
     cloudshield_own_identities: str = ""
+    # Extended checks: CloudShield runs Prowler as a separate program that you install yourself.
+    # PROWLER_PYTHON is a Python that has prowler installed. PROWLER_COMMAND is a JSON list used
+    # when it is empty.
+    prowler_python: str = ""
+    prowler_command: str = '["prowler"]'
+    prowler_services: str = "s3 ec2 iam"
+    prowler_timeout_seconds: int = 1800
+    cloudshield_data_dir: str = "./data"
+    keep_raw_output: bool = False
 
 
 def load_env_file() -> None:

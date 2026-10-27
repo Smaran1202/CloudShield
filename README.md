@@ -117,6 +117,23 @@ python -m cloudshield.imports prowler path\to\prowler-output.ocsf.json
 Imported findings are marked with their source, and their evidence is labelled "reported". See
 `docs/limitations.md` and `docs/third-party.md`.
 
+To run the extended checks from the dashboard ("Run full scan"), install Prowler yourself and
+check that CloudShield can start it:
+
+```powershell
+python -m cloudshield.imports check-runner
+```
+
+See `docs/extended-checks.md` for the install steps and the settings.
+
+If your computer blocks Prowler, run it somewhere else (for example AWS CloudShell) and import the
+file from the dashboard: choose "Import a results file" in the Run scan menu. The window shows the
+commands to run and takes the `.json` file. The same steps are in `docs/extended-checks.md`.
+
+The fix page of an imported finding shows the scanner's advice formatted as it was meant, and, for
+13 checks, a "What to do" section written by CloudShield from AWS documentation. Check those steps
+against the AWS page they link to before you act.
+
 ## Checks
 
 From the repository root, with the virtual environment active:

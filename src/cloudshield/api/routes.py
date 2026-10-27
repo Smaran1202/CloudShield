@@ -3,23 +3,28 @@ from dataclasses import dataclass
 from datetime import datetime, time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from cloudshield.api.jobs import run_scan_job
 from cloudshield.api.schemas import (
+    CloudShieldSteps,
     DispositionIn,
+    ExtendedStatusOut,
     FindingDetailOut,
     FindingOut,
     FindingSource,
     FixOut,
     ImportedResourceOut,
     ImportOut,
+    ImportResultOut,
     ResourceOut,
     RiskSummaryOut,
     ScanOut,
     ScanRequest,
+    ScoreBreakdown,
     SuggestedNotApplicable,
     TrendPoint,
 )
@@ -39,9 +44,16 @@ from cloudshield.dispositions import (
     suggested_not_applicable,
 )
 from cloudshield.findings import SEVERITIES, FindingStatus, Severity
+from cloudshield.fixes.explain import redact
 from cloudshield.fixes.service import make_fix
+from cloudshield.fixes.templates import NOT_CHECKED
+from cloudshield.imports.guidance import guidance_for
+from cloudshield.imports.parser import MAX_BYTES, AlreadyImported, ImportRejected
 from cloudshield.imports.recheck import latest_import_id
+from cloudshield.imports.runner import INSTALL_COMMAND, ExtendedError, cloudshell_command
+from cloudshield.imports.upload import ImportBusy, import_upload
 from cloudshield.risk.environment import environment_score, severity_counts
+from cloudshield.risk.scoring import score_breakdown
 
 router = APIRouter(prefix="/api")
 
@@ -70,6 +82,10 @@ def finding_out(row: FindingRow, view: View) -> FindingOut:
     out.not_rechecked = (
         row.source == "prowler" and row.status == "OPEN" and row.import_id != view.newest_import
     )
+    breakdown = score_breakdown(
+        row.severity, row.risk_score, row.risk_factors, row.source, row.score_basis
+    )
+    out.score_breakdown = ScoreBreakdown(**breakdown) if breakdown else None
     out.dismissed = is_dismissed(row, view.now)
     if row.disposition != "none" and not out.dismissed:
         # The disposition has expired, so the finding is open again.
@@ -102,9 +118,31 @@ def start_scan(
             raise HTTPException(status_code=409, detail="A scan is already running.")
         scan = store.create_scan(session, regions)
 
-    args = (state.session_factory, scan.id, regions, state.scan_function)
+    extended = state.extended_function if body and body.extended else None
+    args = (state.session_factory, scan.id, regions, state.scan_function, extended)
     threading.Thread(target=run_scan_job, args=args, daemon=True).start()
     return scan
+
+
+@router.get("/extended/status", response_model=ExtendedStatusOut)
+def extended_status(request: Request) -> ExtendedStatusOut:
+    """Whether the extended checks can run here. It never starts a scan."""
+    state = request.app.state
+    answer = state.extended_status.get()
+    regions = [state.settings.aws_region] if state.settings.aws_region else []
+    try:
+        run_command = cloudshell_command(state.settings, regions)
+    except ExtendedError:
+        run_command = None  # a setting is missing or not valid; the log of a run says which
+    return ExtendedStatusOut(
+        available=answer.available,
+        version=answer.version,
+        reason=answer.reason,
+        hint=answer.hint,
+        blocked=answer.blocked,
+        install_command=INSTALL_COMMAND,
+        run_command=run_command,
+    )
 
 
 @router.get("/scans", response_model=list[ScanOut])
@@ -218,13 +256,24 @@ def get_finding(
     return finding
 
 
+def fix_out(row: FixRow, finding: FindingRow) -> FixOut:
+    """The stored fix, with the parts that are read from CloudShield's own data each time."""
+    out = FixOut.model_validate(row)
+    if finding.source == "prowler":
+        steps = guidance_for(finding.details.get("check_id"))
+        out.cloudshield_steps = CloudShieldSteps(**steps) if steps else None
+    else:
+        out.not_checked = NOT_CHECKED.get(finding.rule_id, [])
+    return out
+
+
 @router.post("/findings/{finding_id}/fix", response_model=FixOut)
 def create_fix(
     finding_id: str,
     request: Request,
     session: Annotated[Session, Depends(get_session)],
     refresh: bool = False,
-) -> FixRow:
+) -> FixOut:
     finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
     if finding is None:
         raise HTTPException(status_code=404, detail="Finding not found.")
@@ -232,22 +281,26 @@ def create_fix(
         stored = session.get(FixRow, (ACCOUNT_ID, finding_id))
         if stored is None:
             raise HTTPException(status_code=409, detail="This finding is resolved and has no fix.")
-        return stored
+        return fix_out(stored, finding)
     state = request.app.state
     try:
-        return make_fix(
+        row = make_fix(
             session, finding, state.settings, state.ai_limit, state.gemini_transport, refresh
         )
     except LookupError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return fix_out(row, finding)
 
 
 @router.get("/findings/{finding_id}/fix", response_model=FixOut)
-def get_stored_fix(finding_id: str, session: Annotated[Session, Depends(get_session)]) -> FixRow:
+def get_stored_fix(
+    finding_id: str, session: Annotated[Session, Depends(get_session)]
+) -> FixOut:
     fix = session.get(FixRow, (ACCOUNT_ID, finding_id))
-    if fix is None:
+    finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
+    if fix is None or finding is None:
         raise HTTPException(status_code=404, detail="No stored fix for this finding.")
-    return fix
+    return fix_out(fix, finding)
 
 
 @router.patch("/findings/{finding_id}/disposition", response_model=FindingOut)
@@ -303,9 +356,53 @@ def list_imports(session: Annotated[Session, Depends(get_session)]) -> list[Impo
             rejected=row.counts["rejected"],
             ignored=row.counts["ignored"],
             regions_covered=row.regions_covered,
+            origin=row.origin,
+            duration_seconds=row.duration_seconds,
+            services_used=row.services_used,
+            regions_used=row.regions_used,
+            scan_id=row.scan_id,
         )
         for row in session.scalars(query.order_by(ImportRow.id.desc()))
     ]
+
+
+async def read_limited_body(request: Request) -> bytes:
+    """Reads the request body, and stops as soon as it is over the size limit."""
+    too_large = HTTPException(status_code=413, detail="The file is over 50 MB, which is too large.")
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit() and int(declared) > MAX_BYTES:
+        raise too_large
+    body = bytearray()
+    async for chunk in request.stream():
+        body += chunk
+        if len(body) > MAX_BYTES:
+            raise too_large
+    return bytes(body)
+
+
+@router.post("/imports/prowler", response_model=ImportResultOut)
+async def upload_prowler(
+    request: Request, x_filename: Annotated[str | None, Header()] = None
+) -> dict:
+    """Imports a results file sent from the dashboard. The reply holds counts only."""
+    if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
+        raise HTTPException(status_code=415, detail="Send the file as application/json.")
+    lock = request.app.state.import_lock
+    if not lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Another import is running. Wait for it.")
+    try:
+        raw = await read_limited_body(request)
+        return await run_in_threadpool(
+            import_upload, request.app.state.session_factory, raw, x_filename
+        )
+    except AlreadyImported as exc:
+        raise HTTPException(status_code=409, detail=redact(str(exc))) from exc
+    except ImportBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ImportRejected as exc:
+        raise HTTPException(status_code=422, detail=redact(str(exc))) from exc
+    finally:
+        lock.release()
 
 
 @router.get("/resources/imported", response_model=list[ImportedResourceOut])

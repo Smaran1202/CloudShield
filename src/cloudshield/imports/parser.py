@@ -26,6 +26,10 @@ class ImportRejected(Exception):
     """The file cannot be imported. The message says why, in plain words."""
 
 
+class AlreadyImported(ImportRejected):
+    """This exact file was imported before."""
+
+
 @dataclass(frozen=True)
 class Record:
     check_id: str

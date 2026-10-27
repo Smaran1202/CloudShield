@@ -29,6 +29,10 @@ class ScanRow(Base):
     severity_counts: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     errors: Mapped[list] = mapped_column(JSON, default=list)
     failure_message: Mapped[str | None]
+    # How the extended checks (Prowler) went: ok, failed, unavailable or skipped.
+    extended_status: Mapped[str] = mapped_column(default="skipped", server_default="skipped")
+    extended_message: Mapped[str | None]
+    extended_hint: Mapped[str | None]
 
 
 class ResourceRow(Base):
@@ -53,7 +57,8 @@ class FixRow(Base):
     )
     finding_id: Mapped[str] = mapped_column(primary_key=True)
     evidence_hash: Mapped[str]
-    blast_radius: Mapped[dict] = mapped_column(JSON)
+    # No longer used. The column stays so that no migration is needed.
+    blast_radius: Mapped[dict] = mapped_column(JSON, default=dict)
     patches: Mapped[list] = mapped_column(JSON)
     guidance: Mapped[list] = mapped_column(JSON)
     pre_checks: Mapped[list] = mapped_column(JSON)
@@ -123,6 +128,11 @@ class ImportRow(Base):
     tool_version: Mapped[str | None]
     pass_count: Mapped[int | None]
     fail_count: Mapped[int | None]
+    origin: Mapped[str] = mapped_column(default="file", server_default="file")  # file or dashboard
+    duration_seconds: Mapped[float | None]
+    services_used: Mapped[list | None] = mapped_column(JSON)
+    regions_used: Mapped[list | None] = mapped_column(JSON)
+    scan_id: Mapped[int | None]  # the scan that started a dashboard run
 
 
 class PassedCheckRow(Base):

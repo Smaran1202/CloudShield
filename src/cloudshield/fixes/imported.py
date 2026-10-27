@@ -5,37 +5,41 @@ from sqlalchemy.orm import Session
 
 from cloudshield.db.models import FindingRow, FixRow
 from cloudshield.db.store import utcnow
+from cloudshield.imports.guidance import guidance_for
 
-# Imported findings have no patch templates and no AI explanation: CloudShield did not collect
-# the evidence, so it only passes on what the external tool reported.
-SKIPPED = "imported from an external tool: no AI explanation is generated"
-BLAST_NOTE = (
-    "The tool that reported this finding does not say what depends on the resource, and "
-    "CloudShield did not collect it. The blast radius is unknown."
+# Imported findings have no patch templates and no AI text: CloudShield did not collect the
+# evidence, so it only passes on what the external scanner reported, and says so once.
+NOT_COLLECTED = "CloudShield did not collect this evidence."
+GENERIC_PRE_CHECK = "Find out what depends on this resource before you change it."
+VERIFY = (
+    "Run the full scan to verify, or import a newer results file with "
+    "python -m cloudshield.imports prowler <file>. The finding resolves only when the check "
+    "passes."
 )
 
 
 def imported_parts(finding: FindingRow) -> dict:
     details = finding.details
+    entry = guidance_for(details.get("check_id"))
     guidance = [details["remediation"]] if details.get("remediation") else []
     guidance += [f"Reference: {url}" for url in details.get("references", [])]
     if not guidance:
-        guidance = ["The external tool gave no remediation text for this check."]
+        guidance = ["The external scanner gave no remediation text for this check."]
     evidence_ids = [f"e{number}" for number in range(1, len(finding.evidence["items"]) + 1)]
     return {
-        "blast_radius": {"level": "unknown", "factors": [], "notes": [BLAST_NOTE]},
         "patches": [],
         "guidance": guidance,
-        "pre_checks": ["Find out what depends on this resource before you change it."],
+        "pre_checks": entry["before_you_apply"] if entry else [GENERIC_PRE_CHECK],
         "rollback": "No rollback steps are generated for an imported finding.",
-        "verify": "Run the tool again and import its new output. The finding resolves when the "
-        "check passes.",
+        "verify": VERIFY,
+        # The scanner's own description of the risk is passed on as it was written. CloudShield
+        # adds no explanation of its own.
         "explanation": {
-            "why_it_matters": details.get("risk") or finding.title,
-            "what_changes": "No patch is generated. Follow the guidance from the external tool.",
-            "what_could_break": f"Blast radius: unknown. {BLAST_NOTE}",
+            "why_it_matters": details.get("risk") or "",
+            "what_changes": "",
+            "what_could_break": "",
             "cited": evidence_ids,
-            "skipped_reason": SKIPPED,
+            "skipped_reason": NOT_COLLECTED,
         },
     }
 
@@ -50,7 +54,7 @@ def make_imported_fix(session: Session, finding: FindingRow) -> FixRow:
         row = FixRow(account_id=finding.account_id, finding_id=finding.finding_id)
         session.add(row)
     row.evidence_hash = digest
-    row.blast_radius = parts["blast_radius"]
+    row.blast_radius = {}
     row.patches = parts["patches"]
     row.guidance = parts["guidance"]
     row.pre_checks = parts["pre_checks"]

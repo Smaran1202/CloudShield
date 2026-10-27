@@ -94,6 +94,23 @@ def context_factors(resource: dict, instances: list[dict], ec2_known: bool) -> l
     return [f for f in factors if f is not None]
 
 
+def score_breakdown(
+    severity: str, score: int | None, factors: list[dict], source: str, basis: str
+) -> dict | None:
+    """How a stored score was made, from the same numbers the scoring code used."""
+    if score is None:
+        return None
+    base = BASE_SCORES[severity]
+    adjustments = sum(f["adjustment"] for f in factors)
+    return {
+        "base": base,
+        "base_source": "scanner" if source == "prowler" else "cloudshield",
+        "adjustments": adjustments,
+        "capped": base + adjustments > 100,
+        "basis": basis,
+    }
+
+
 def score_findings(findings: list[Finding], result: dict, regions: list[str]) -> list[Finding]:
     resources = {r["resource_id"]: r for r in result["resources"]}
     instances = [r for r in result["resources"] if r["resource_type"] == "EC2"]

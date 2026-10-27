@@ -105,9 +105,7 @@ def test_the_schema_has_the_reported_certainty_and_the_source_field(tmp_path):
     assert "not_rechecked" in schemas["FindingOut"]["properties"]
 
 
-def test_the_fix_of_an_imported_finding_is_guidance_with_unknown_blast_radius(
-    tmp_path, monkeypatch
-):
+def test_the_fix_of_an_imported_finding_is_guidance_with_no_ai_text(tmp_path, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setenv("GEMINI_MODEL", "model-a")
     calls = []
@@ -125,15 +123,19 @@ def test_the_fix_of_an_imported_finding_is_guidance_with_unknown_blast_radius(
     assert response.status_code == 200
     assert calls == []
     assert fix["patches"] == []
-    assert fix["blast_radius"]["level"] == "unknown"
-    assert fix["blast_radius"]["factors"] == []
+    assert "blast_radius" not in fix
+    assert fix["not_checked"] == []
+    assert fix["cloudshield_steps"] is None
+    assert fix["pre_checks"] == ["Find out what depends on this resource before you change it."]
     assert fix["guidance"] == [
         "Fix s3_bucket_public_access like this.",
         "Reference: https://example.com/s3_bucket_public_access",
     ]
     assert fix["generated_by"] == "template"
     assert fix["model"] is None
-    assert "no AI explanation" in fix["explanation"]["skipped_reason"]
+    assert fix["explanation"]["skipped_reason"] == "CloudShield did not collect this evidence."
+    assert fix["explanation"]["what_changes"] == ""
+    assert fix["explanation"]["what_could_break"] == ""
     assert fix["explanation"]["cited"] == ["e1", "e2", "e3", "e4", "e5"]
     assert client.post(f"/api/findings/{imported(client)['finding_id']}/fix").json() == fix
 

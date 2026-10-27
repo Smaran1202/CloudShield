@@ -114,8 +114,8 @@ def public_access_block_fix(finding: dict, resource: dict) -> dict:
         patch("cli", "Block all public access (AWS CLI)", cli + "\n"),
     ]
     pre_checks = [
-        "Read the bucket policy and the blast radius: a public allow statement stops working "
-        "once public policies are blocked.",
+        "Read the bucket policy: a public allow statement stops working once public "
+        "policies are blocked.",
         "Check whether the bucket hosts a static website or is a public origin, because public "
         "reads will stop.",
         "Check that nothing relies on anonymous access to objects in this bucket.",
@@ -348,6 +348,31 @@ BUILDERS = {
     "CIS-SG-001": open_security_group_fix,
     "CIS-IAM-001": wildcard_policy_guidance,
     "SX-IAM-PRIVESC-001": privilege_escalation_guidance,
+}
+
+
+# What CloudShield does not look at for each rule. The fix page and the explanation say so,
+# because a finding with nothing listed here would look as if everything had been checked.
+NOT_CHECKED = {
+    "CIS-S3-001": [
+        "Static website hosting",
+        "Bucket and object ACLs",
+        "CloudFront origins that read this bucket",
+    ],
+    "CIS-S3-002": [
+        "Permissions on the KMS key",
+        "Which roles and users read or write this bucket",
+    ],
+    "CIS-S3-003": ["Lifecycle rules for old versions", "Tools that use this bucket"],
+    "CIS-SG-001": [
+        "Who connects to these ports (flow logs are not collected)",
+        "Load balancers, databases and other services that use this group",
+    ],
+    "CIS-IAM-001": ["Actual use of the permissions (no CloudTrail or last-accessed data)"],
+    "SX-IAM-PRIVESC-001": [
+        "Actual use of the permissions (no CloudTrail or last-accessed data)",
+        "Permission boundaries, service control policies and resource policies",
+    ],
 }
 
 

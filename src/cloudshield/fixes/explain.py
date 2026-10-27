@@ -23,8 +23,13 @@ SYSTEM_INSTRUCTION = (
     "You explain one cloud security fix to an engineer. Use only the facts in the data you are "
     "given. Do not write code, commands or configuration. Do not mention any resource id, ARN, "
     "address range or port that is not in the data. Cite the evidence items you rely on by their "
-    "ids (e1, e2, ...). If the blast radius is unknown, say that it is unknown; never say it is "
-    "safe. Keep each field to two or three sentences."
+    "ids (e1, e2, ...). In what_could_break, use only the evidence and the pre_checks, and say "
+    "what CloudShield did not check, using the not_checked list and the words \"did not check\". "
+    "Never say that a change is safe, harmless or low risk. Keep each field to two or three "
+    "sentences."
+)
+UNSAFE_WORDS = re.compile(
+    r"\b(safe|safely|harmless|risk[- ]free|no risk|low risk|zero risk)\b", re.IGNORECASE
 )
 RESPONSE_SCHEMA = {
     "type": "OBJECT",
@@ -102,7 +107,8 @@ def build_payload(context: dict) -> dict:
             "resource_id": finding["resource_id"],
         },
         "evidence": evidence_with_ids(finding["evidence"]),
-        "blast_radius": context["blast_radius"],
+        "pre_checks": context["pre_checks"],
+        "not_checked": context["not_checked"],
         "patches": patches,
         "guidance": context["guidance"],
     }
@@ -152,9 +158,14 @@ WHY = {
 }
 
 
+def what_could_break(pre_checks: list[str], not_checked: list[str]) -> str:
+    before = " ".join(pre_checks)
+    unseen = "; ".join(not_checked) or "what else depends on this resource"
+    return f"{before} CloudShield did not check: {unseen}.".strip()
+
+
 def template_explanation(context: dict) -> dict:
     finding = context["finding"]
-    blast = context["blast_radius"]
     why = WHY.get(finding["rule_id"], finding["title"]).format(resource=finding["resource_id"])
     patches = context["patches"]
     if patches:
@@ -162,12 +173,11 @@ def template_explanation(context: dict) -> dict:
         changes = f"The fix is available as: {formats}. Review the patch text before you apply it."
     else:
         changes = "No patch is generated. Follow the guidance and review the evidence."
-    notes = " ".join(blast["notes"])
     cited = [item["id"] for item in evidence_with_ids(finding["evidence"])]
     return {
         "why_it_matters": why,
         "what_changes": changes,
-        "what_could_break": f"Blast radius: {blast['level']}. {notes}".strip(),
+        "what_could_break": what_could_break(context["pre_checks"], context["not_checked"]),
         "cited": cited,
     }
 
@@ -179,6 +189,11 @@ def check_explanation(explanation: dict, evidence_ids: set[str], allowed: str) -
     if unknown_ids:
         return f"cites evidence that does not exist: {unknown_ids}"
     text = " ".join(explanation[name] for name in TEXT_FIELDS)
+    if UNSAFE_WORDS.search(text):
+        return "calls a change safe"
+    lowered = explanation["what_could_break"].lower()
+    if "did not check" not in lowered and "not checked" not in lowered:
+        return "does not say what was not checked"
     if "`" in text:
         return "contains code"
     if ACCOUNT_ID.search(text):

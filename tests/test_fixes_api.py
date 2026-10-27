@@ -10,6 +10,7 @@ from cloudshield.db import store
 from cloudshield.db.models import Base, FixRow
 from cloudshield.db.session import make_engine
 from cloudshield.fixes.__main__ import main as export_main
+from cloudshield.fixes.templates import NOT_CHECKED
 from cloudshield.risk.scoring import score_findings
 from cloudshield.rules import run_rules
 from cloudshield.scanner.common import make_resource
@@ -32,7 +33,7 @@ OPEN_SSH = {
 GOOD = {
     "why_it_matters": "Anyone on the internet can try to reach this resource.",
     "what_changes": "The risky setting is changed by the patch.",
-    "what_could_break": "Impact depends on the blast radius, which may be unknown.",
+    "what_could_break": "Impact depends on what uses it. CloudShield did not check that.",
     "cited": ["e1"],
 }
 
@@ -109,7 +110,9 @@ def use_gemini(monkeypatch) -> None:
     monkeypatch.setenv("GEMINI_MODEL", "model-a")
 
 
-def test_fix_for_the_open_ssh_group_has_patches_blast_radius_and_a_template_explanation(tmp_path):
+def test_fix_for_the_open_ssh_group_has_patches_not_checked_and_a_template_explanation(
+    tmp_path,
+):
     client = make_client(tmp_path)
     seed(client, [group(), running_instance()])
     fid = finding_id(client, "CIS-SG-001")
@@ -122,9 +125,10 @@ def test_fix_for_the_open_ssh_group_has_patches_blast_radius_and_a_template_expl
     assert [p["format"] for p in fix["patches"]] == ["terraform", "cloudformation", "cli"]
     cli = fix["patches"][2]["content"]
     assert "aws ec2 revoke-security-group-ingress --group-id sg-0abc123" in cli
-    assert fix["blast_radius"]["level"] == "medium"
-    assert fix["blast_radius"]["factors"][0]["value"] == ["i-1"]
+    assert "blast_radius" not in fix
     assert fix["pre_checks"]
+    assert fix["not_checked"] == NOT_CHECKED["CIS-SG-001"]
+    assert fix["cloudshield_steps"] is None
     assert "authorize-security-group-ingress" in fix["rollback"]
     assert fix["verify"] == "Rescan (POST /api/scans). This finding should resolve."
     assert fix["generated_by"] == "template"
@@ -133,7 +137,9 @@ def test_fix_for_the_open_ssh_group_has_patches_blast_radius_and_a_template_expl
     assert fix["created_at"].endswith("Z")
 
 
-def test_fix_for_the_public_bucket_has_three_patches_and_unknown_blast_radius(tmp_path):
+def test_fix_for_the_public_bucket_has_three_patches_and_says_what_was_not_checked(
+    tmp_path,
+):
     client = make_client(tmp_path)
     seed(client, [bucket()])
     fid = finding_id(client, "CIS-S3-001")
@@ -141,7 +147,8 @@ def test_fix_for_the_public_bucket_has_three_patches_and_unknown_blast_radius(tm
     fix = client.post(f"/api/findings/{fid}/fix").json()
 
     assert [p["format"] for p in fix["patches"]] == ["terraform", "cloudformation", "cli"]
-    assert fix["blast_radius"]["level"] == "unknown"
+    assert "Static website hosting" in fix["not_checked"]
+    assert "Bucket and object ACLs" in fix["not_checked"]
     assert "BlockPublicAcls=true" in fix["patches"][2]["content"]
 
 
@@ -154,7 +161,7 @@ def test_fix_for_an_iam_finding_is_guidance_only(tmp_path):
 
     assert fix["patches"] == []
     assert len(fix["guidance"]) >= 3
-    assert fix["blast_radius"]["level"] == "high"
+    assert fix["not_checked"] == NOT_CHECKED["CIS-IAM-001"]
 
 
 def test_fix_for_kms_finding_marks_the_patch_as_needing_input(tmp_path):

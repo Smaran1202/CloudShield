@@ -79,9 +79,11 @@
 - The AWS CLI patch for a security group uses a JSON file with the exact rule, so it works for
   port ranges, all protocols and IPv6. It removes only the open address range from that rule.
 - Findings for IAM policies and roles have guidance only, no patch.
-- Blast radius uses stored data only. Website hosting, ACLs, flow logs, CloudTrail and
-  last-accessed data are not collected, so those parts are unknown, and unknown is never reported
-  as low. Running instances are taken from the scan that last saw the finding.
+- There is no blast radius. Each rule lists the pre-checks to make before applying a fix and a
+  short list of what CloudShield does not look at (for example website hosting and ACLs for the
+  public bucket rule, flow logs and other users of a security group, CloudTrail and last-accessed
+  data for IAM). The fix page shows both, and the explanation must name what was not checked and
+  never call a change safe.
 - The AI explanation is optional text. It is checked against the data, but not every invented name
   can be detected. See `ai-data.md`.
 - The hourly AI limit is counted in the memory of one server process and starts again when the
@@ -111,8 +113,18 @@
   completed scan, with no errors for that service, no longer finds. That resolves it with the
   reason "resource no longer exists". It is never applied to IAM roles, to policies owned by AWS,
   to a resource we never scanned, or to a security group in a region that scan did not cover.
-- Imported findings have no patch templates and no AI explanation. The blast radius is always
-  unknown. The fix view shows Prowler's remediation text and links.
+- Imported findings have no patch templates and no AI text. The fix view shows the scanner's
+  remediation text and links as they were written, drawn through one small renderer (bold, inline
+  code, bullet lists and http or https links only, never HTML). A "- " run is split into a list
+  only after a lead-in that ends in a colon and has two or more items.
+- "What to do" steps exist only for 13 checks, listed in `imports/guidance.py`. They are written
+  by CloudShield from the AWS documentation page named in each entry, with the day it was read.
+  Commands are read-only (list, get, describe). Anything that changes AWS is described in words.
+  Where a console menu path was not checked in the documentation, the entry states the goal and
+  links the page instead. They are a starting point: check them against the AWS documentation
+  before you act. A check with no entry keeps the scanner's guidance only.
+- "Run full scan to verify" shows one of Resolved, Still open or Not rechecked, and only after
+  the finding has been fetched again. Not rechecked means the check did not run in that scan.
 - The title of an imported failure is the scanner's own failing statement, or "Failed: " and the
   check's title when there is none. The check's own title describes the passing state, so it is
   kept only in the details. All evidence from an import has the certainty "reported" and the
@@ -144,5 +156,32 @@
   from `GET /api/resources`.
 - Each import keeps its file's base name, the tool name and version from the file, and its pass
   and fail counts. Imports made before this was added show these as empty.
+- The dashboard runs Prowler only for this computer's account. There is no login yet, so run
+  the app on localhost only.
+- The extended checks run after CloudShield's own scan and can never fail it. If Prowler is
+  missing, blocked, too slow or its file is rejected, the scan still completes and records the
+  reason and a hint. Only the services in `PROWLER_SERVICES` (default s3, ec2, iam) and the
+  regions of the scan are checked. A run whose results file is identical to an earlier one is
+  reported as already imported.
+- Only one extended run can happen at a time. A run is stopped with everything it started after
+  `PROWLER_TIMEOUT_SECONDS`. The raw output is deleted after the import unless
+  `KEEP_RAW_OUTPUT` is true.
+- The whole environment is never handed to Prowler, only the variables it needs to find your
+  AWS profile and run. Keys that are not in that list, such as the Gemini key, are not passed.
+- Prowler's flags were checked against its documentation and source (`-f`, `--services`, `-M`,
+  `-o`, `-b`, `-z`, `--version`). A different Prowler version may change them.
+- A results file can be imported from the dashboard (origin "Upload"). The API reads the body in
+  pieces and refuses it with 413 when it passes 50 MB, even if no size was declared. Only the base
+  name of the file is kept. The import is refused with 409 while another import or a scan is
+  running. The file comes from you, so everything in "Imported findings" about reported evidence
+  applies. There is no login yet, so anyone who can reach the API can send a file; run it on
+  localhost only.
+- When the operating system blocks Prowler, the dashboard says so and offers the file route. A block
+  is recognised from the start error (Windows error 4551, a permission error) or from the words
+  "Application Control policy" in Prowler's own output. A block with other wording shows as an
+  ordinary failure with the last lines of output.
+- The CloudShell commands in the import window have not been run in a real CloudShell by
+  CloudShield's author. They are the same flags a dashboard run uses. CloudShell's Python and its
+  download option may differ from what you see; the window describes the goal and not a menu path.
 - A file is identified by its SHA-256. The same file is refused for the same account id, but a
   file with one extra space is a different file.

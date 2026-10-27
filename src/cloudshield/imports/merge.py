@@ -16,6 +16,15 @@ ALSO_REPORTED = "Also reported by an imported scan"
 NOT_COMPARED = "CloudShield could not read this setting, so the two results are not compared."
 
 
+def latest_completed_scan(session: Session, account_id: str) -> ScanRow | None:
+    query = (
+        select(ScanRow)
+        .where(ScanRow.account_id == account_id, ScanRow.status == "completed")
+        .order_by(ScanRow.id.desc())
+    )
+    return session.scalars(query).first()
+
+
 def without_corroboration(evidence: dict) -> dict:
     items = [i for i in evidence.get("items", []) if i["fact"] not in (ALSO_REPORTED, NOT_COMPARED)]
     return {**evidence, "items": items}
@@ -54,18 +63,15 @@ def when_imported(session: Session, imported: FindingRow | None, passed) -> str:
     return moment.isoformat()
 
 
-def reconcile(session: Session, account_id: str) -> None:
+def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) -> None:
     """Works out, for every pair in SAME_CHECK, how our finding and the imported one relate.
 
     Both fail: ours stays primary, and the imported one is merged into it and hidden.
     They disagree: both stay visible and are flagged. The result is rebuilt each time, so it is
     always in step with the latest scan and the latest import. When our side has no data
     for a resource, the two are never compared: nothing is merged or flagged."""
-    scan = session.scalars(
-        select(ScanRow)
-        .where(ScanRow.account_id == account_id, ScanRow.status == "completed")
-        .order_by(ScanRow.id.desc())
-    ).first()
+    # The scan being saved right now, or else the latest one that finished.
+    scan = scan or latest_completed_scan(session, account_id)
     for check_id, our_rule in SAME_CHECK.items():
         imported_rows = session.scalars(
             select(FindingRow).where(

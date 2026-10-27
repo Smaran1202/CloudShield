@@ -1,5 +1,6 @@
 import logging
 from collections import Counter
+from dataclasses import dataclass
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,11 +10,22 @@ from cloudshield.db.store import utcnow
 from cloudshield.findings import make_finding_id
 from cloudshield.imports.build import fill_finding, refresh_text
 from cloudshield.imports.mapping import rule_id_of
-from cloudshield.imports.merge import PASSED_REASON, reconcile
-from cloudshield.imports.parser import ImportRejected, ParsedFile, Record
+from cloudshield.imports.merge import PASSED_REASON, latest_completed_scan, reconcile
+from cloudshield.imports.parser import AlreadyImported, ParsedFile, Record
 from cloudshield.imports.recheck import resolve_gone_resources
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class RunInfo:
+    """How an import came about: from a file you gave, or from a run started in the dashboard."""
+
+    origin: str = "file"
+    duration_seconds: float | None = None
+    services: list[str] | None = None
+    regions: list[str] | None = None
+    scan_id: int | None = None
 
 
 def check_not_imported(session: Session, parsed: ParsedFile, account_id: str) -> None:
@@ -23,7 +35,7 @@ def check_not_imported(session: Session, parsed: ParsedFile, account_id: str) ->
     earlier = session.scalars(query).first()
     if earlier is not None:
         when = earlier.imported_at.strftime("%Y-%m-%d %H:%M")
-        raise ImportRejected(f"This file was already imported (import {earlier.id}, {when} UTC).")
+        raise AlreadyImported(f"This file was already imported (import {earlier.id}, {when} UTC).")
 
 
 def account_warning(session: Session, parsed: ParsedFile, account_id: str) -> str | None:
@@ -86,9 +98,17 @@ def save_failure(
 
 
 def import_parsed(
-    session: Session, parsed: ParsedFile, account_id: str, file_name: str | None = None
+    session: Session,
+    parsed: ParsedFile,
+    account_id: str,
+    file_name: str | None = None,
+    run: RunInfo | None = None,
+    scan: ScanRow | None = None,
 ) -> dict:
-    """Stores the records of one file. Returns the counts and an optional warning."""
+    """Stores the records of one file. Returns the counts and an optional warning.
+
+    `scan` is the scan being saved right now, when the import is part of one."""
+    run = run or RunInfo()
     check_not_imported(session, parsed, account_id)
     warning = account_warning(session, parsed, account_id)
     now = utcnow()
@@ -106,6 +126,11 @@ def import_parsed(
         tool_version=parsed.tool_version,
         pass_count=sum(r.status == "PASS" for r in parsed.records),
         fail_count=sum(r.status == "FAIL" for r in parsed.records),
+        origin=run.origin,
+        duration_seconds=run.duration_seconds,
+        services_used=run.services,
+        regions_used=run.regions,
+        scan_id=run.scan_id,
     )
     session.add(import_row)
     session.flush()
@@ -118,16 +143,11 @@ def import_parsed(
             save_failure(session, record, account_id, import_row, now, counts)
         session.flush()
 
-    scan_query = (
-        select(ScanRow)
-        .where(ScanRow.account_id == account_id, ScanRow.status == "completed")
-        .order_by(ScanRow.id.desc())
-    )
-    scan = session.scalars(scan_query).first()
+    scan = scan or latest_completed_scan(session, account_id)
     if scan is not None:
         counts["resolved"] += resolve_gone_resources(session, scan, account_id, now)
 
-    reconcile(session, account_id)
+    reconcile(session, account_id, scan)
     import_row.counts = {
         "imported": counts["imported"],
         "passed": counts["passed"],

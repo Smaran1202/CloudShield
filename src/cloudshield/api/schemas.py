@@ -12,10 +12,10 @@ from pydantic import (
 from cloudshield.findings import Certainty, FindingStatus, Severity
 
 ScanStatus = Literal["queued", "running", "completed", "failed"]
+ExtendedStatus = Literal["ok", "failed", "unavailable", "skipped"]
 FindingSource = Literal["cloudshield", "prowler"]
 ScoreBasis = Literal["severity only", "context adjusted"]
 Disposition = Literal["none", "accepted", "not_applicable"]
-BlastLevel = Literal["low", "medium", "high", "unknown"]
 PatchFormat = Literal["terraform", "cloudformation", "cli"]
 Region = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
 # The database stores UTC without a timezone; the API always says it is UTC.
@@ -27,6 +27,8 @@ class ScanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     regions: list[Region] | None = None
+    # Also run the extended checks (Prowler) after CloudShield's own scan.
+    extended: bool = False
 
 
 class ScanError(BaseModel):
@@ -53,6 +55,9 @@ class ScanOut(BaseModel):
     severity_counts: dict[str, int]
     errors: list[ScanError]
     failure_message: str | None
+    extended_status: ExtendedStatus
+    extended_message: str | None
+    extended_hint: str | None
 
 
 class ResourceOut(BaseModel):
@@ -95,6 +100,16 @@ class SuggestedNotApplicable(BaseModel):
     reason: str
 
 
+class ScoreBreakdown(BaseModel):
+    """How a risk score was made: base + adjustments, capped at 100."""
+
+    base: int
+    base_source: Literal["scanner", "cloudshield"]
+    adjustments: int
+    capped: bool
+    basis: ScoreBasis
+
+
 class FindingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -120,6 +135,8 @@ class FindingOut(BaseModel):
     # An open imported finding that the newest import did not mention.
     not_rechecked: bool = False
     score_basis: ScoreBasis
+    # None when the finding has no score.
+    score_breakdown: ScoreBreakdown | None = None
     # Set on an imported finding that repeats one of ours. It is left out of every list.
     merged_into: str | None
     # Imported scans that report the same thing as this finding, and what they say.
@@ -165,6 +182,38 @@ class ImportOut(BaseModel):
     rejected: int
     ignored: int
     regions_covered: list[str]
+    origin: Literal["file", "dashboard", "upload"]
+    duration_seconds: float | None
+    services_used: list[str] | None
+    regions_used: list[str] | None
+    scan_id: int | None
+
+
+class ExtendedStatusOut(BaseModel):
+    available: bool
+    version: str | None
+    reason: str | None
+    hint: str | None
+    # True when an operating-system policy stops the second scanner from running here.
+    blocked: bool
+    # The commands to run the second scanner somewhere else. run_command is empty when no
+    # region is set on the server, because it is built from the same settings as a run.
+    install_command: str
+    run_command: str | None
+
+
+class ImportCountsOut(BaseModel):
+    imported: int
+    passed: int
+    ignored: int
+    already_seen: int
+    resolved: int
+    rejected: int
+
+
+class ImportResultOut(BaseModel):
+    import_id: int
+    counts: ImportCountsOut
 
 
 class ImportedResourceOut(BaseModel):
@@ -203,10 +252,20 @@ class PatchOut(BaseModel):
     instructions_only: bool
 
 
-class BlastRadiusOut(BaseModel):
-    level: BlastLevel
-    factors: list[EvidenceItem]
-    notes: list[str]
+class StepOut(BaseModel):
+    text: str
+    command: str | None
+
+
+class CloudShieldSteps(BaseModel):
+    """Steps written by CloudShield for an imported check, from the AWS documentation."""
+
+    check_id: str
+    summary: str
+    steps: list[StepOut]
+    before_you_apply: list[str]
+    docs_url: str
+    verified_on: str
 
 
 class ExplanationOut(BaseModel):
@@ -222,10 +281,13 @@ class FixOut(BaseModel):
 
     finding_id: str
     evidence_hash: str
-    blast_radius: BlastRadiusOut
     patches: list[PatchOut]
     guidance: list[str]
     pre_checks: list[str]
+    # What CloudShield does not look at for this rule. Not stored: read from the rule.
+    not_checked: list[str] = []
+    # Only for an imported finding whose check has an entry. Not stored.
+    cloudshield_steps: CloudShieldSteps | None = None
     rollback: str
     verify: str
     explanation: ExplanationOut

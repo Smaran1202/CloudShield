@@ -57,3 +57,17 @@ Each finding has an `evidence` object with a list of `items`. An item is
 `{fact, value, source, certainty}`, where `source` is the path of the field in the stored resource's
 `attributes` that the value came from. Evidence is built from the resource facts the rule used. It
 contains no AI-written text.
+
+## How a score was made
+
+Each finding with a score has a `score_breakdown`: `base`, `base_source` (`cloudshield` for our own
+rules, `scanner` for an imported finding), `adjustments`, `capped` and `basis`. The score is
+`min(100, base + adjustments)`. The dashboard writes it as, for example, "70 = 70 from the
+scanner's HIGH rating + 0 from CloudShield context. No scan data for this resource."
+
+For an imported finding the base comes from the scanner's severity alone (CRITICAL 90, HIGH 70,
+MEDIUM 40, LOW 20; INFO has no score). Our three context factors are added only when our own scan
+stored a resource with the same id (`basis` is then "context adjusted"). They describe our scan of
+that resource, not the imported check. Otherwise there is one factor, "context not available for
+imported findings", with adjustment 0 (`basis` is "severity only"). The score is worked out when
+the file is imported and is not refreshed by a later scan.

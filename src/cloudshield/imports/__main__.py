@@ -6,6 +6,7 @@ from cloudshield.db.models import ACCOUNT_ID
 from cloudshield.db.session import make_engine, make_session_factory
 from cloudshield.imports.importer import import_parsed, refresh_parsed
 from cloudshield.imports.parser import ImportRejected, parse_file
+from cloudshield.imports.runner import check_runner
 
 LABELS = [
     ("imported", "Imported"),
@@ -52,6 +53,16 @@ def import_prowler(path: str, account_id: str, refresh: bool = False) -> int:
     return 0
 
 
+def check_extended_runner() -> int:
+    status = check_runner(Settings())
+    if status.available:
+        print(f"Prowler can run here: {status.version}")
+        return 0
+    print(f"Prowler cannot run here: {status.reason}")
+    print(f"What to do: {status.hint}")
+    return 1
+
+
 def main(argv: list[str] | None = None, load_env: bool = True) -> int:
     if load_env:
         load_env_file()
@@ -65,7 +76,10 @@ def main(argv: list[str] | None = None, load_env: bool = True) -> int:
         action="store_true",
         help="re-apply parsing to findings that already exist, even for an imported file",
     )
+    commands.add_parser("check-runner", help="check that Prowler can run on this computer")
     args = parser.parse_args(argv)
+    if args.command == "check-runner":
+        return check_extended_runner()
     return import_prowler(args.file, args.account_id, args.refresh)
 
 

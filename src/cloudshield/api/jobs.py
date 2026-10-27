@@ -5,6 +5,9 @@ import boto3
 from sqlalchemy.orm import Session, sessionmaker
 
 from cloudshield.db import store
+from cloudshield.db.models import ScanRow
+from cloudshield.imports.extended import run_extended_stage
+from cloudshield.imports.runner import RunOutput
 from cloudshield.risk.scoring import score_findings
 from cloudshield.rules import run_rules
 from cloudshield.scanner.scan import scan_account
@@ -25,14 +28,23 @@ def run_scan_job(
     scan_id: int,
     regions: list[str],
     scan_function: Callable[[list[str]], dict],
+    extended_function: Callable[[list[str]], RunOutput] | None = None,
 ) -> None:
     with session_factory() as session:
         store.mark_running(session, scan_id)
         try:
             result = scan_function(regions)
-            store.set_progress(session, scan_id, "Running rules and saving findings")
+            store.set_progress(session, scan_id, "Running CloudShield rules")
             findings = score_findings(run_rules(result["resources"]), result, regions)
-            store.save_result(session, scan_id, result, findings)
+            if extended_function is None:
+                store.save_result(session, scan_id, result, findings)
+                return
+            # Our own findings are saved first. The extended stage cannot undo them.
+            store.save_result(session, scan_id, result, findings, finish=False)
+            extended = run_extended_stage(
+                session, session.get(ScanRow, scan_id), regions, extended_function
+            )
+            store.finish_scan(session, scan_id, extended)
         except Exception as exc:
             # The scan runs in a background thread, so the error has to be recorded on the scan
             # row for the user to see it.

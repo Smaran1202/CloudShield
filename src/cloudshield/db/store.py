@@ -43,7 +43,7 @@ def create_scan(session: Session, regions: list[str]) -> ScanRow:
 def mark_running(session: Session, scan_id: int) -> None:
     scan = session.get(ScanRow, scan_id)
     scan.status = "running"
-    scan.progress = "Scanning AWS"
+    scan.progress = "Reading resources"
     scan.started_at = utcnow()
     session.commit()
 
@@ -73,23 +73,46 @@ def fail_unfinished(session: Session) -> None:
     session.commit()
 
 
-def save_result(session: Session, scan_id: int, result: dict, findings: list[Finding]) -> None:
+def save_result(
+    session: Session,
+    scan_id: int,
+    result: dict,
+    findings: list[Finding],
+    finish: bool = True,
+) -> None:
+    """Saves what the scan found. With finish=False the scan stays running, so the extended
+    checks can still be added before it is marked completed."""
     scan = session.get(ScanRow, scan_id)
     now = utcnow()
     save_resources(session, scan_id, result["resources"])
     save_findings(session, scan_id, findings, now)
     resolve_fixed(session, scan, result, {f.finding_id for f in findings}, now)
     scan.errors = result["errors"]
-    scan.status = "completed"
     resolve_gone_resources(session, scan, ACCOUNT_ID, now)
     session.flush()
-    reconcile(session, ACCOUNT_ID)
+    reconcile(session, ACCOUNT_ID, scan)
     save_environment_score(session, scan)
-    scan.progress = "Done"
-    scan.finished_at = now
     scan.resource_count = len(result["resources"])
     scan.finding_count = len(findings)
     scan.error_count = len(result["errors"])
+    if finish:
+        scan.status = "completed"
+        scan.progress = "Done"
+        scan.finished_at = now
+    session.commit()
+
+
+def finish_scan(session: Session, scan_id: int, extended: dict) -> None:
+    """Marks a scan completed, with the outcome of its extended checks."""
+    scan = session.get(ScanRow, scan_id)
+    scan.extended_status = extended["status"]
+    scan.extended_message = extended["message"]
+    scan.extended_hint = extended["hint"]
+    # Imported findings may have been added since the score was first worked out.
+    save_environment_score(session, scan)
+    scan.status = "completed"
+    scan.progress = "Done"
+    scan.finished_at = utcnow()
     session.commit()
 
 
