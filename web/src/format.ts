@@ -1,4 +1,4 @@
-import type { ScanOut } from "./api";
+import type { FindingOut, ScanOut } from "./api";
 
 // Dates always spell the month ("5 Oct 2026, 2:42 pm"). A date like 2/10 can mean the second
 // of October or the tenth of February, so a numeric day and month is never shown.
@@ -54,6 +54,28 @@ export function scanDuration(scan: Pick<ScanOut, "started_at" | "finished_at">):
 // Imported rule ids start with "PRW-". The user sees the check id without it.
 export function ruleLabel(ruleId: string): string {
   return ruleId.startsWith("PRW-") ? ruleId.slice("PRW-".length) : ruleId;
+}
+
+// How a score was made, from the numbers the backend gives. It copies no score table.
+export function scoreSentence(finding: FindingOut): string | null {
+  const breakdown = finding.score_breakdown;
+  if (!breakdown || finding.risk_score === null) return null;
+  const rating =
+    breakdown.base_source === "scanner"
+      ? `the scanner's ${finding.severity} rating`
+      : `the ${finding.severity} rule rating`;
+  let text = `${finding.risk_score} = ${breakdown.base} from ${rating} + ${breakdown.adjustments} from CloudShield context.`;
+  if (breakdown.capped) text += " Capped at 100.";
+  if (breakdown.basis === "severity only" && finding.source === "prowler") {
+    text += " No scan data for this resource.";
+  }
+  return text;
+}
+
+export function durationText(seconds: number | null): string {
+  if (seconds === null) return "-";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 }
 
 export function pretty(value: unknown): string {

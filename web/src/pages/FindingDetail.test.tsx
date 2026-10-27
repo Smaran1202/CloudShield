@@ -156,7 +156,7 @@ describe("Finding detail: stepper", () => {
     );
     expect(items.map((i) => i.textContent)).toEqual([
       expect.stringContaining("Review the evidence"),
-      expect.stringContaining("Check the blast radius"),
+      expect.stringContaining("Check before you apply"),
       expect.stringContaining("Apply the fix yourself"),
       expect.stringContaining("Rescan to verify"),
     ]);
@@ -383,31 +383,23 @@ describe("Finding detail: Fix tab", () => {
     expect((await findPanelItems())[1]).toHaveClass("ring-4");
   });
 
-  it("shows the blast radius level and each factor with its certainty chip", async () => {
+  it("lists what CloudShield did not check, and has no blast radius anywhere", async () => {
     await generated();
 
     const card = screen
-      .getByRole("heading", { name: "Blast radius" })
+      .getByRole("heading", { name: "CloudShield did not check" })
       .closest("section") as HTMLElement;
-    expect(card.querySelector('[data-level="medium"]')).toHaveTextContent("medium");
-    expect(
-      within(card).getByText("Running instances using this group"),
-    ).toBeInTheDocument();
-    expect(card.querySelector('[data-certainty="verified"]')).not.toBeNull();
-    expect(card.querySelector('[data-certainty="unknown"]')).not.toBeNull();
-    expect(
-      within(card).getByText("Use SSM Session Manager instead of SSH."),
-    ).toBeInTheDocument();
+    expect(within(card).getByText("Who connects to these ports")).toBeInTheDocument();
+    expect(document.body.textContent?.toLowerCase()).not.toContain("blast");
   });
 
-  it("draws an unknown blast radius with a dashed border", async () => {
-    const unknown = fix({ blast_radius: { level: "unknown", factors: [], notes: [] } });
-    await generated({ [`POST ${path}/fix`]: unknown });
+  it("shows the checklist from the pre-checks of the fix", async () => {
+    await generated();
 
-    const chip = document.querySelector('[data-level="unknown"]') as HTMLElement;
-
-    expect(chip).toHaveTextContent("unknown");
-    expect(chip).toHaveClass("border-dashed");
+    const card = screen
+      .getByRole("heading", { name: "Before you apply it" })
+      .closest("section") as HTMLElement;
+    expect(within(card).getAllByRole("checkbox").length).toBeGreaterThan(0);
   });
 
   it("shows the evidence card next to the fix, with certainty chips", async () => {

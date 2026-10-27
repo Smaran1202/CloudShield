@@ -63,7 +63,7 @@ describe("Certainty chip", () => {
 
     expect(container.firstElementChild).toHaveAttribute(
       "title",
-      expect.stringContaining("external tool"),
+      expect.stringContaining("external scanner"),
     );
   });
 });
@@ -236,19 +236,14 @@ describe("Finding detail: imported finding", () => {
     finding_id: ID,
     patches: [],
     guidance: ["Set the minimum length to 14.", "Reference: https://example.com/check"],
-    blast_radius: {
-      level: "unknown",
-      factors: [],
-      notes: ["Nothing known about dependents."],
-    },
     generated_by: "template",
     model: null,
     explanation: {
       why_it_matters: "Short passwords are easy to guess.",
-      what_changes: "No patch is generated.",
-      what_could_break: "Blast radius: unknown.",
+      what_changes: "",
+      what_could_break: "",
       cited: ["e1"],
-      skipped_reason: "imported from an external tool: no AI explanation is generated",
+      skipped_reason: "CloudShield did not collect this evidence.",
     },
   });
   const routes = {
@@ -286,7 +281,7 @@ describe("Finding detail: imported finding", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the external guidance with its links, no patch, unknown blast radius and no AI", async () => {
+  it("shows the external guidance with its links, no patch and no AI", async () => {
     const user = renderApp(`/findings/${ID}?tab=fix`, routes);
 
     await user.click(await screen.findByRole("button", { name: "Generate fix" }));
@@ -300,12 +295,24 @@ describe("Finding detail: imported finding", () => {
     expect(callsTo("POST", `${path}/fix`)).toHaveLength(1);
   });
 
-  it("does not offer a rescan to verify, because only a newer import can resolve it", async () => {
-    renderApp(`/findings/${ID}?tab=fix`, routes);
+  it("offers no plain rescan, only a full scan or a newer import, to verify", async () => {
+    renderApp(`/findings/${ID}?tab=fix`, {
+      ...routes,
+      "GET /api/extended/status": {
+        available: true,
+        version: "v",
+        reason: null,
+        hint: null,
+      },
+    });
 
     await screen.findByText(/external scanner/);
 
     expect(screen.queryByRole("region", { name: "Verify" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Verify with a full scan" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rescan to verify" })).toBeNull();
   });
 
   it("does not make a link from a reference that is not a web address", async () => {

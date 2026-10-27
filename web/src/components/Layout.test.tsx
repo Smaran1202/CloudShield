@@ -81,7 +81,7 @@ describe("Header: shell", () => {
 
     expect(button).toHaveClass("min-h-12");
     expect(button).toHaveClass("bg-ink");
-    expect(button).toHaveClass("rounded-chip");
+    expect(button).toHaveClass("rounded-l-chip");
   });
 
   it("shows a page for addresses that do not exist", async () => {

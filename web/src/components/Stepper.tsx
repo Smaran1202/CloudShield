@@ -2,7 +2,7 @@ export type StepState = "done" | "current" | "todo";
 
 const STEPS = [
   "Review the evidence",
-  "Check the blast radius",
+  "Check before you apply",
   "Apply the fix yourself",
   "Rescan to verify",
 ];

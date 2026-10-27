@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 import { api } from "../api";
-import { formatDate, formatRelative } from "../format";
+import { durationText, formatDate, formatRelative } from "../format";
 import { shortResource } from "../lanes";
+import { useScans, useRefreshWhenScanEnds } from "../ScanContext";
 import { useAsync } from "../useAsync";
 import { Icon, iconForResource } from "./Icon";
-import { AsyncView, EmptyState, SectionTitle } from "./ui";
+import { AsyncView, EmptyState, SECONDARY_BUTTON, SectionTitle } from "./ui";
 
 export const IMPORTED_RESOURCES_GRID =
   "grid grid-cols-[minmax(0,1fr)_168px_144px_120px_120px] items-center gap-4";
 
 export const IMPORTS_GRID =
-  "grid grid-cols-[minmax(0,1.4fr)_96px_minmax(0,1.2fr)_72px_72px_96px_96px_96px] items-center gap-4";
+  "grid grid-cols-[minmax(0,1.4fr)_104px_88px_minmax(0,1.2fr)_88px_64px_64px_80px_88px_88px] items-center gap-4";
 
 const heading = "text-label font-semibold";
 
@@ -99,23 +100,30 @@ export function ImportedResources() {
   );
 }
 
+const ORIGIN_LABEL = { file: "File", dashboard: "Dashboard", upload: "Upload" } as const;
+
 const count = (value: number | null) => (value === null ? "-" : value);
 
 // Every file that was imported, newest first.
 export function ImportHistory() {
   const [state, reload] = useAsync(() => api.imports());
+  const { openImport } = useScans();
+  useRefreshWhenScanEnds(reload);
   return (
     <section aria-label="Imports" className="mt-16">
       <SectionTitle>Imports</SectionTitle>
-      <p className="mt-1 mb-6 text-secondary text-dim">
+      <p className="mt-1 mb-4 text-secondary text-dim">
         Results files you imported from another scanner.
       </p>
+      <button type="button" className={`${SECONDARY_BUTTON} mb-6`} onClick={openImport}>
+        Import a results file
+      </button>
       <AsyncView state={state} onRetry={reload} label="Loading imports" shape="table">
         {(imports) =>
           imports.length === 0 ? (
             <EmptyState title="No file has been imported yet" />
           ) : (
-            <Box label="Imports" minWidth="min-w-[960px]">
+            <Box label="Imports" minWidth="min-w-[1100px]">
               <div
                 role="row"
                 data-testid="imports-header"
@@ -123,8 +131,10 @@ export function ImportHistory() {
               >
                 {[
                   "File",
+                  "Origin",
                   "Version",
                   "Imported",
+                  "Duration",
                   "Pass",
                   "Fail",
                   "Added",
@@ -149,6 +159,7 @@ export function ImportHistory() {
                   >
                     {item.file_name ?? "-"}
                   </span>
+                  <span role="cell">{ORIGIN_LABEL[item.origin]}</span>
                   <span role="cell">{item.tool_version ?? "-"}</span>
                   <span role="cell" title={formatDate(item.imported_at)}>
                     <span className="block font-semibold">
@@ -157,6 +168,9 @@ export function ImportHistory() {
                     <span className="block text-label text-dim">
                       {formatRelative(item.imported_at)}
                     </span>
+                  </span>
+                  <span role="cell" className="tabular-nums">
+                    {durationText(item.duration_seconds)}
                   </span>
                   <span role="cell" className="tabular-nums">
                     {count(item.pass_count)}

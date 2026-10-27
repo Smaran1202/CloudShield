@@ -8,6 +8,8 @@ export type VerifyState =
   | { phase: "scanning" }
   | { phase: "resolved"; fixed: number; toGo: number }
   | { phase: "open" }
+  // The check did not run in that scan, so nothing can be said about the finding.
+  | { phase: "not_rechecked"; message: string }
   | { phase: "failed"; message: string };
 
 // "Rescan to verify": start a scan, wait for it to end, fetch the finding again, and only then
@@ -16,6 +18,7 @@ export function useVerify(findingId: string, onChecked: () => void) {
   const { runner, finished, lastFinished } = useScans();
   const [state, setState] = useState<VerifyState>({ phase: "idle" });
   const waiting = useRef(false);
+  const extended = useRef(false);
   const seen = useRef(finished);
   const checked = useRef(onChecked);
   checked.current = onChecked;
@@ -25,10 +28,13 @@ export function useVerify(findingId: string, onChecked: () => void) {
     setState({ phase: "idle" });
   }, [findingId]);
 
-  function start() {
+  // `withExtended` runs the extended checks too, which is the only way an imported finding can
+  // be checked again.
+  function start(withExtended = false) {
     waiting.current = true;
+    extended.current = withExtended;
     setState({ phase: "scanning" });
-    runner.start();
+    runner.start(withExtended);
   }
 
   // The scan could not start, or contact with the API was lost while it ran.
@@ -51,12 +57,21 @@ export function useVerify(findingId: string, onChecked: () => void) {
       });
       return;
     }
+    const ran = lastFinished;
     Promise.all([api.finding(findingId), api.findings()]).then(
       ([fresh, all]) => {
         checked.current();
         if (fresh.status === "RESOLVED") {
           const fixed = all.filter((f) => f.status === "RESOLVED").length;
           setState({ phase: "resolved", fixed, toGo: all.length - fixed });
+        } else if (extended.current && ran.extended_status !== "ok") {
+          const why = ran.extended_message ?? "The extended checks did not run.";
+          setState({ phase: "not_rechecked", message: why });
+        } else if (extended.current && fresh.not_rechecked) {
+          setState({
+            phase: "not_rechecked",
+            message: "This check did not run in that scan, so the result is not known.",
+          });
         } else {
           setState({ phase: "open" });
         }

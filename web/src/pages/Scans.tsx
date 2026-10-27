@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, type ScanOut } from "../api";
 import { Icon } from "../components/Icon";
 import { ImportHistory } from "../components/ImportedSections";
+import { ExtendedResult } from "../components/ScanControl";
 import { Tooltip } from "../components/Tooltip";
 import {
   AsyncView,
@@ -126,6 +127,11 @@ function ScanRow({ scan, index }: { scan: ScanOut; index: number }) {
         </span>
         <span role="cell">
           <StatusChip status={scan.status} />
+          {scan.extended_status !== "skipped" && (
+            <span className="mt-1 block text-label text-dim">
+              Extended: {scan.extended_status}
+            </span>
+          )}
           {inProgress && <span className="mt-1 block">{scan.progress}</span>}
         </span>
         <span role="cell" title={formatDate(scan.started_at)}>
@@ -157,6 +163,11 @@ function ScanRow({ scan, index }: { scan: ScanOut; index: number }) {
           )}
         </span>
       </div>
+      {scan.extended_status !== "skipped" && (
+        <div className="space-y-1 px-4 pb-4 text-secondary">
+          <ExtendedResult scan={scan} role="note" />
+        </div>
+      )}
       {hasDetails && open && (
         <div className="space-y-3 px-4 pb-4 text-secondary">
           {scan.failure_message && (

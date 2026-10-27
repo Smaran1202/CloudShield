@@ -10,7 +10,7 @@ export type FindingSource = "cloudshield" | "prowler";
 export type ScoreBasis = "severity only" | "context adjusted";
 export type Disposition = "none" | "accepted" | "not_applicable";
 export type ScanStatus = "queued" | "running" | "completed" | "failed";
-export type BlastLevel = "low" | "medium" | "high" | "unknown";
+export type ExtendedStatus = "ok" | "failed" | "unavailable" | "skipped";
 export type PatchFormat = "terraform" | "cloudformation" | "cli";
 
 export const SEVERITIES: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
@@ -37,6 +37,9 @@ export interface ScanOut {
   severity_counts: Record<string, number>;
   errors: ScanError[];
   failure_message: string | null;
+  extended_status: ExtendedStatus;
+  extended_message: string | null;
+  extended_hint: string | null;
 }
 
 export interface ResourceOut {
@@ -73,6 +76,14 @@ export interface Corroboration {
   last_imported_at: string;
 }
 
+export interface ScoreBreakdown {
+  base: number;
+  base_source: "scanner" | "cloudshield";
+  adjustments: number;
+  capped: boolean;
+  basis: ScoreBasis;
+}
+
 export interface FindingOut {
   finding_id: string;
   rule_id: string;
@@ -95,6 +106,7 @@ export interface FindingOut {
   last_imported_at: string | null;
   not_rechecked: boolean;
   score_basis: ScoreBasis;
+  score_breakdown: ScoreBreakdown | null;
   merged_into: string | null;
   corroborated_by: Corroboration[];
   tools_disagree: boolean;
@@ -138,10 +150,19 @@ export interface PatchOut {
   instructions_only: boolean;
 }
 
-export interface BlastRadiusOut {
-  level: BlastLevel;
-  factors: EvidenceItem[];
-  notes: string[];
+export interface StepOut {
+  text: string;
+  command: string | null;
+}
+
+// Steps written by CloudShield for an imported check, from the AWS documentation.
+export interface CloudShieldSteps {
+  check_id: string;
+  summary: string;
+  steps: StepOut[];
+  before_you_apply: string[];
+  docs_url: string;
+  verified_on: string;
 }
 
 export interface ExplanationOut {
@@ -155,10 +176,12 @@ export interface ExplanationOut {
 export interface FixOut {
   finding_id: string;
   evidence_hash: string;
-  blast_radius: BlastRadiusOut;
   patches: PatchOut[];
   guidance: string[];
   pre_checks: string[];
+  // What CloudShield does not look at for this rule.
+  not_checked: string[];
+  cloudshield_steps: CloudShieldSteps | null;
   rollback: string;
   verify: string;
   explanation: ExplanationOut;
@@ -188,7 +211,39 @@ export interface ImportOut {
   rejected: number;
   ignored: number;
   regions_covered: string[];
+  origin: "file" | "dashboard" | "upload";
+  duration_seconds: number | null;
+  services_used: string[] | null;
+  regions_used: string[] | null;
+  scan_id: number | null;
 }
+
+export interface ExtendedStatusOut {
+  available: boolean;
+  version: string | null;
+  reason: string | null;
+  hint: string | null;
+  // True when an operating-system policy stops the second scanner from running here.
+  blocked: boolean;
+  // The commands to run it somewhere else. run_command is null when no region is set on the
+  // server.
+  install_command: string;
+  run_command: string | null;
+}
+
+export interface ImportResultOut {
+  import_id: number;
+  counts: {
+    imported: number;
+    passed: number;
+    ignored: number;
+    already_seen: number;
+    resolved: number;
+    rejected: number;
+  };
+}
+
+export const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
 
 export interface ImportedResourceOut {
   resource_id: string;
@@ -241,7 +296,28 @@ export const api = {
   health: () => request<HealthOut>("/api/health"),
   scans: () => request<ScanOut[]>("/api/scans"),
   scan: (id: number) => request<ScanOut>(`/api/scans/${id}`),
-  startScan: () => request<ScanOut>("/api/scans", { method: "POST" }),
+  startScan: (extended = false) =>
+    request<ScanOut>(
+      "/api/scans",
+      extended
+        ? {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ extended: true }),
+          }
+        : { method: "POST" },
+    ),
+  extendedStatus: () => request<ExtendedStatusOut>("/api/extended/status"),
+  // The file is sent as it is. The name travels in a header, encoded so any character is safe.
+  uploadImport: (file: File) =>
+    request<ImportResultOut>("/api/imports/prowler", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Filename": encodeURIComponent(file.name),
+      },
+      body: file,
+    }),
   resources: () => request<ResourceOut[]>("/api/resources"),
   importedResources: () => request<ImportedResourceOut[]>("/api/resources/imported"),
   imports: () => request<ImportOut[]>("/api/imports"),

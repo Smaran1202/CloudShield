@@ -250,11 +250,6 @@ describe("Finding page: an imported finding", () => {
     finding_id: IMPORTED_ID,
     patches: [],
     guidance: ["Set the minimum length to 14.", "Reference: https://example.com/c"],
-    blast_radius: {
-      level: "unknown",
-      factors: [],
-      notes: ["Nothing is known about dependents."],
-    },
     generated_by: "template",
     model: null,
   });
@@ -271,7 +266,7 @@ describe("Finding page: an imported finding", () => {
     expect(card.querySelector("h2")?.nextElementSibling).toBe(line);
   });
 
-  it("shows the guidance and links, an unknown blast radius with its note, and how to check", async () => {
+  it("shows the guidance and links, and how to check with a full scan", async () => {
     const user = renderApp(`/findings/${IMPORTED_ID}?tab=fix`, routes);
 
     await user.click(await screen.findByRole("button", { name: "Generate fix" }));
@@ -280,9 +275,8 @@ describe("Finding page: an imported finding", () => {
     expect(
       screen.getByRole("link", { name: "https://example.com/c" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Nothing is known about dependents.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Run the scan again, then import the new file/),
+      screen.getByText("python -m cloudshield.imports prowler <file>"),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Rescan/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Verify" })).not.toBeInTheDocument();
@@ -702,6 +696,11 @@ describe("Scans: imports", () => {
           rejected: 1,
           ignored: 0,
           regions_covered: ["ap-southeast-2"],
+          origin: "dashboard",
+          duration_seconds: 192.4,
+          services_used: ["s3"],
+          regions_used: ["ap-southeast-2"],
+          scan_id: 7,
         },
         {
           id: 1,
@@ -717,6 +716,11 @@ describe("Scans: imports", () => {
           rejected: 0,
           ignored: 0,
           regions_covered: [],
+          origin: "file",
+          duration_seconds: null,
+          services_used: null,
+          regions_used: null,
+          scan_id: null,
         },
       ],
     });
@@ -730,8 +734,10 @@ describe("Scans: imports", () => {
         .map((h) => h.textContent),
     ).toEqual([
       "File",
+      "Origin",
       "Version",
       "Imported",
+      "Duration",
       "Pass",
       "Fail",
       "Added",
@@ -743,15 +749,17 @@ describe("Scans: imports", () => {
       .getAllByRole("cell")
       .map((c) => c.textContent);
     expect(cells[0]).toBe("second.json");
-    expect(cells[1]).toBe("5.44.0");
-    expect(cells[2]).toContain(formatDate("2026-10-05T04:42:00Z"));
-    expect(cells.slice(3)).toEqual(["15", "25", "20", "3", "1"]);
+    expect(cells[1]).toBe("Dashboard");
+    expect(cells[2]).toBe("5.44.0");
+    expect(cells[3]).toContain(formatDate("2026-10-05T04:42:00Z"));
+    expect(cells[4]).toBe("3m 12s");
+    expect(cells.slice(5)).toEqual(["15", "25", "20", "3", "1"]);
     expect(
       within(oldest)
         .getAllByRole("cell")
         .map((c) => c.textContent)
-        .slice(0, 2),
-    ).toEqual(["-", "-"]);
+        .slice(0, 3),
+    ).toEqual(["-", "File", "-"]);
   });
 
   it("says when nothing was imported", async () => {

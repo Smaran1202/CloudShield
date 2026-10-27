@@ -8,6 +8,9 @@ export interface Call {
   path: string;
   search: string;
   body: unknown;
+  headers: Record<string, string>;
+  // True when the request body was a file, which is not read here.
+  bodyIsFile: boolean;
 }
 
 type Answer = unknown;
@@ -64,7 +67,16 @@ export function mockApi(routes: Record<string, Handler>) {
       const url = new URL(String(input));
       const method = (init?.method ?? "GET").toUpperCase();
       const body = typeof init?.body === "string" ? JSON.parse(init.body) : null;
-      const call = { method, path: url.pathname, search: url.search, body };
+      const headers = Object.fromEntries(new Headers(init?.headers).entries());
+      const bodyIsFile = init?.body instanceof Blob;
+      const call = {
+        method,
+        path: url.pathname,
+        search: url.search,
+        body,
+        headers,
+        bodyIsFile,
+      };
       calls.push(call);
       const key = `${method} ${url.pathname}`;
       if (!(key in routes)) {

@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, type FindingDetailOut } from "../api";
 import { DismissControls } from "../components/DismissControls";
 import { FixTab } from "../components/FixPanel";
+import { RichText } from "../components/RichText";
 import { Stepper, stepStates } from "../components/Stepper";
 import { Tabs } from "../components/Tabs";
 import {
@@ -17,7 +18,7 @@ import {
   SeverityChip,
   StatusChip,
 } from "../components/ui";
-import { formatDate, pretty } from "../format";
+import { formatDate, pretty, scoreSentence } from "../format";
 import { LANE_BACKGROUND, laneOf, shortResource } from "../lanes";
 import { useRefreshWhenScanEnds } from "../ScanContext";
 import { useAsync } from "../useAsync";
@@ -82,6 +83,14 @@ export function FindingDetail() {
               {finding.not_rechecked && (
                 <p className="mt-3">
                   <NotRechecked finding={finding} />
+                </p>
+              )}
+              {scoreSentence(finding) && (
+                <p
+                  data-testid="score-how-header"
+                  className="mt-3 text-secondary text-dim"
+                >
+                  {scoreSentence(finding)}
                 </p>
               )}
               {finding.tools_disagree && (
@@ -229,9 +238,15 @@ function Evidence({
                 <span className="font-semibold">{item.fact}</span>
                 <CertaintyChip certainty={item.certainty} />
               </div>
-              <pre className="mt-3 overflow-x-auto font-mono text-secondary break-words whitespace-pre-wrap">
-                {item.value === null ? "no value" : pretty(item.value)}
-              </pre>
+              {item.certainty === "reported" && typeof item.value === "string" ? (
+                <div className="mt-3">
+                  <RichText text={item.value} />
+                </div>
+              ) : (
+                <pre className="mt-3 overflow-x-auto font-mono text-secondary break-words whitespace-pre-wrap">
+                  {item.value === null ? "no value" : pretty(item.value)}
+                </pre>
+              )}
               <p className="mt-3 text-secondary text-dim">
                 Source: <code className="font-mono">{item.source}</code>
               </p>
@@ -260,9 +275,8 @@ function Risk({ finding }: { finding: FindingDetailOut }) {
   }
   return (
     <Card>
-      <p className="mb-4 text-secondary">
-        Score {finding.risk_score}: the base score for {finding.severity} plus these
-        adjustments, capped at 100.
+      <p data-testid="score-how" className="mb-4 text-secondary font-semibold">
+        {scoreSentence(finding)}
       </p>
       <ul className="divide-y-2 divide-divider">
         {finding.risk_factors.map((factor) => (

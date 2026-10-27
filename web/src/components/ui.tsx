@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react";
 import type {
-  BlastLevel,
   Certainty,
   FindingOut,
   FindingSource,
@@ -116,7 +115,7 @@ const CERTAINTY_HELP: Record<Certainty, string> = {
   verified: "Read directly from AWS in a scan",
   heuristic: "A conclusion the scan cannot fully prove",
   unknown: "The data needed was not available",
-  reported: "Reported by an external tool. CloudShield did not check it",
+  reported: "Reported by an external scanner. CloudShield did not check it",
 };
 
 export function CertaintyChip({ certainty }: { certainty: Certainty }) {
@@ -220,21 +219,6 @@ export function FindingNotes({ finding }: { finding: FindingOut }) {
         </span>
       )}
     </>
-  );
-}
-
-const LEVEL_CHIP: Record<BlastLevel, string> = {
-  low: "bg-chip-ok-bg text-chip-ok-text",
-  medium: "bg-chip-warn-bg text-chip-warn-text",
-  high: "bg-chip-high-bg text-chip-high-text",
-  unknown: "border-2 border-dashed border-dash bg-transparent text-dim",
-};
-
-export function LevelChip({ level }: { level: BlastLevel }) {
-  return (
-    <span className={`${CHIP} uppercase ${LEVEL_CHIP[level]}`} data-level={level}>
-      {level}
-    </span>
   );
 }
 

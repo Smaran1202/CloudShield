@@ -8,6 +8,7 @@ import {
 } from "react";
 import { api, type ScanOut } from "./api";
 import { useAsync, type AsyncState } from "./useAsync";
+import { ImportDialog } from "./components/ImportDialog";
 import { useScanRunner, type Runner } from "./useScanRunner";
 
 interface ScanContextValue {
@@ -19,6 +20,9 @@ interface ScanContextValue {
   lastFinished: ScanOut | null;
   // True for a moment after a scan completes.
   flash: boolean;
+  // The import dialog is one for the whole app. Each stored import counts up `imports`.
+  openImport: () => void;
+  imports: number;
 }
 
 const ScanContext = createContext<ScanContextValue | null>(null);
@@ -32,6 +36,8 @@ export function ScanProvider({ children }: { children: ReactNode }) {
   const [finished, setFinished] = useState(0);
   const [lastFinished, setLastFinished] = useState<ScanOut | null>(null);
   const [flash, setFlash] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [imports, setImports] = useState(0);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const runner = useScanRunner((scan) => {
@@ -63,9 +69,24 @@ export function ScanProvider({ children }: { children: ReactNode }) {
 
   return (
     <ScanContext.Provider
-      value={{ scans, reloadScans, runner, finished, lastFinished, flash }}
+      value={{
+        scans,
+        reloadScans,
+        runner,
+        finished,
+        lastFinished,
+        flash,
+        openImport: () => setImportOpen(true),
+        imports,
+      }}
     >
       {children}
+      {importOpen && (
+        <ImportDialog
+          onClose={() => setImportOpen(false)}
+          onImported={() => setImports((n) => n + 1)}
+        />
+      )}
     </ScanContext.Provider>
   );
 }
@@ -76,14 +97,15 @@ export function useScans(): ScanContextValue {
   return value;
 }
 
-// Fetch again, without blanking the page, each time a scan ends.
+// Fetch again, without blanking the page, each time a scan ends or a file is imported.
 export function useRefreshWhenScanEnds(reload: () => void): void {
-  const { finished } = useScans();
-  const seen = useRef(finished);
+  const { finished, imports } = useScans();
+  const changes = finished + imports;
+  const seen = useRef(changes);
   useEffect(() => {
-    if (finished !== seen.current) {
-      seen.current = finished;
+    if (changes !== seen.current) {
+      seen.current = changes;
       reload();
     }
-  }, [finished]);
+  }, [changes]);
 }

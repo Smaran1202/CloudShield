@@ -9,7 +9,7 @@ export interface Runner {
   phase: RunnerPhase;
   scan: ScanOut | null;
   message: string | null;
-  start: () => void;
+  start: (extended?: boolean) => void;
   attach: (scan: ScanOut) => void;
 }
 
@@ -56,16 +56,19 @@ export function useScanRunner(onFinished?: (scan: ScanOut) => void): Runner {
     handle(first);
   }, []);
 
-  const start = useCallback(() => {
-    setPhase("running");
-    setScan(null);
-    setMessage(null);
-    api.startScan().then(follow, (error) => {
-      if (!alive.current) return;
-      setPhase("error");
-      setMessage(messageOf(error));
-    });
-  }, [follow]);
+  const start = useCallback(
+    (extended = false) => {
+      setPhase("running");
+      setScan(null);
+      setMessage(null);
+      api.startScan(extended).then(follow, (error) => {
+        if (!alive.current) return;
+        setPhase("error");
+        setMessage(messageOf(error));
+      });
+    },
+    [follow],
+  );
 
   return { phase, scan, message, start, attach: follow };
 }

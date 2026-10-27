@@ -10,6 +10,15 @@ export const BASE = {
   "GET /api/scans": [],
   "GET /api/imports": [],
   "GET /api/resources/imported": [],
+  "GET /api/extended/status": {
+    available: true,
+    version: "5",
+    reason: null,
+    hint: null,
+    blocked: false,
+    install_command: "pip install prowler",
+    run_command: null,
+  },
 };
 
 export const never = () => new Promise(() => {});

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { FindingDetailOut, FixOut, PatchOut } from "../api";
-import { pretty } from "../format";
+import type { CloudShieldSteps, FindingDetailOut, FixOut, PatchOut } from "../api";
 import { Icon } from "./Icon";
 import type { FixState } from "../useFixRequest";
 import type { Verify } from "../useVerify";
@@ -9,14 +8,15 @@ import {
   Card,
   CertaintyChip,
   ErrorBox,
-  LevelChip,
   Loading,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
   SectionTitle,
   Tag,
 } from "./ui";
-import { VerifyPanel } from "./VerifyPanel";
+import { PlainWords } from "./PlainWords";
+import { RichText } from "./RichText";
+import { ImportedVerifyPanel, VerifyPanel } from "./VerifyPanel";
 
 const COPIED_MS = 1400;
 
@@ -41,7 +41,7 @@ function BulletList({ items }: { items: string[] }) {
 
 // An imported fix lists the links the external tool gave as "Reference: <url>". Only web links
 // become links.
-function GuidanceList({ items }: { items: string[] }) {
+function GuidanceList({ items, rich }: { items: string[]; rich: boolean }) {
   return (
     <ul className="list-disc space-y-1 pl-6 text-secondary">
       {items.map((item) => {
@@ -62,6 +62,8 @@ function GuidanceList({ items }: { items: string[] }) {
                   {url}
                 </a>
               </>
+            ) : rich ? (
+              <RichText text={item} />
             ) : (
               item
             )}
@@ -128,35 +130,51 @@ export function FixTab({
             {fix.status === "error" && (
               <ErrorBox message={fix.message} onRetry={() => generate(false)} />
             )}
-            {details && (
-              <Explanation
-                fix={details}
-                onRegenerate={imported ? null : () => generate(true)}
-              />
+            {details && !imported && (
+              <Explanation fix={details} onRegenerate={() => generate(true)} />
             )}
+            {details && imported && <ReportedRisk fix={details} />}
           </div>
         </Card>
+        {details?.cloudshield_steps && <WhatToDo steps={details.cloudshield_steps} />}
         {details && details.patches.length > 0 && (
           <PatchPanel patches={details.patches} />
         )}
         {details && details.guidance.length > 0 && (
           <Card>
-            <SectionTitle>Guidance</SectionTitle>
-            <p className="mt-2 mb-3 text-secondary text-dim">
-              No patch is generated for this finding.
-            </p>
-            <GuidanceList items={details.guidance} />
+            <div className="flex flex-wrap items-center gap-3">
+              <SectionTitle>
+                {imported ? "What the scanner recommends" : "Guidance"}
+              </SectionTitle>
+              {imported && <CertaintyChip certainty="reported" />}
+            </div>
+            {!imported && (
+              <p className="mt-2 mb-3 text-secondary text-dim">
+                No patch is generated for this finding.
+              </p>
+            )}
+            <div className="mt-3">
+              <GuidanceList items={details.guidance} rich={imported} />
+            </div>
           </Card>
         )}
+        {details && imported && <PlainWords text={plainText(details, finding)} />}
       </div>
 
       <aside className="flex min-w-[340px] flex-[0_1_400px] flex-col gap-6 lg:max-w-[440px]">
         <EvidenceCard finding={finding} />
-        {details && <BlastCard fix={details} />}
         {details && details.pre_checks.length > 0 && (
           <Checklist items={details.pre_checks} />
         )}
-        {details && (
+        {details && details.not_checked.length > 0 && (
+          <Card>
+            <SectionTitle>CloudShield did not check</SectionTitle>
+            <div className="mt-3">
+              <BulletList items={details.not_checked} />
+            </div>
+          </Card>
+        )}
+        {details && !imported && (
           <Card>
             <Block title="Rollback">
               <p className="text-secondary break-words whitespace-pre-wrap">
@@ -171,18 +189,88 @@ export function FixTab({
           </Card>
         )}
         {imported ? (
-          <Card>
-            <SectionTitle>Check the fix</SectionTitle>
-            <p className="mt-2 text-secondary">
-              Run the scan again, then import the new file. The finding resolves when the
-              check passes.
-            </p>
-          </Card>
+          <ImportedVerifyPanel
+            verify={verify}
+            alreadyResolved={finding.status === "RESOLVED"}
+          />
         ) : (
           <VerifyPanel verify={verify} alreadyResolved={finding.status === "RESOLVED"} />
         )}
       </aside>
     </div>
+  );
+}
+
+// Everything an imported finding says in words, so the glossary can show only the terms in it.
+function plainText(fix: FixOut, finding: FindingDetailOut): string {
+  const steps = fix.cloudshield_steps;
+  const own = steps
+    ? [steps.summary, ...steps.steps.map((s) => s.text), ...steps.before_you_apply]
+    : [];
+  const described = finding.evidence.items.filter((i) => typeof i.value === "string");
+  return [
+    ...fix.guidance,
+    fix.explanation.why_it_matters,
+    ...described.map((i) => String(i.value)),
+    ...own,
+  ].join(" ");
+}
+
+// The scanner's own description of the risk, passed on as it was written.
+function ReportedRisk({ fix }: { fix: FixOut }) {
+  if (!fix.explanation.why_it_matters) return null;
+  return (
+    <section aria-label="Risk reported by the scanner" className="space-y-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <h3 className="font-display text-title font-bold">Risk</h3>
+        <CertaintyChip certainty="reported" />
+      </div>
+      <RichText text={fix.explanation.why_it_matters} />
+    </section>
+  );
+}
+
+// Steps that CloudShield wrote itself, with the AWS page they come from. They are labelled so
+// nobody mistakes them for the scanner's text or for advice that is already checked.
+function WhatToDo({ steps }: { steps: CloudShieldSteps }) {
+  return (
+    <section
+      aria-label="What to do"
+      className="rounded-lane border-2 border-ink bg-white p-6"
+    >
+      <h2 className="font-display text-h3 font-extrabold">What to do</h2>
+      <p className="mt-3 inline-flex items-start gap-2 rounded-chip bg-notice p-3 text-secondary font-semibold text-ink">
+        <Icon name="alert" size={20} className="mt-[2px] shrink-0" />
+        <span>
+          Steps written by CloudShield. Check them against the AWS documentation before
+          you act.
+        </span>
+      </p>
+      <p className="mt-3 text-secondary">{steps.summary}</p>
+      <ol className="mt-4 list-decimal space-y-4 pl-6 text-secondary">
+        {steps.steps.map((step, index) => (
+          <li key={index} className="space-y-2">
+            <p>{step.text}</p>
+            {step.command && (
+              <div className="rounded-chip bg-ink p-3 text-white">
+                <Code text={step.command} label={`command for step ${index + 1}`} />
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-4 text-secondary">
+        <a
+          href={steps.docs_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold break-all underline"
+        >
+          AWS documentation
+        </a>
+        <span className="text-dim"> (read on {steps.verified_on})</span>
+      </p>
+    </section>
   );
 }
 
@@ -384,37 +472,6 @@ function EvidenceCard({ finding }: { finding: FindingDetailOut }) {
             </li>
           ))}
         </ol>
-      )}
-    </Card>
-  );
-}
-
-function BlastCard({ fix }: { fix: FixOut }) {
-  const blast = fix.blast_radius;
-  return (
-    <Card>
-      <SectionTitle>Blast radius</SectionTitle>
-      <p className="mt-3 flex items-center gap-2 text-secondary">
-        Level <LevelChip level={blast.level} />
-      </p>
-      <ul className="mt-3 space-y-3 text-secondary">
-        {blast.factors.map((factor) => (
-          <li key={factor.fact} className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <CertaintyChip certainty={factor.certainty} />
-              <span className="font-semibold">{factor.fact}</span>
-            </div>
-            <p className="break-all text-dim">
-              {factor.value === null ? "unknown" : pretty(factor.value)}
-            </p>
-            <p className="font-mono text-label text-dim">{factor.source}</p>
-          </li>
-        ))}
-      </ul>
-      {blast.notes.length > 0 && (
-        <div className="mt-3">
-          <BulletList items={blast.notes} />
-        </div>
       )}
     </Card>
   );

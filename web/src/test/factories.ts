@@ -26,6 +26,9 @@ export function scan(overrides: Partial<ScanOut> = {}): ScanOut {
     severity_counts: { CRITICAL: 0, HIGH: 2, MEDIUM: 1, LOW: 0, INFO: 1 },
     errors: [],
     failure_message: null,
+    extended_status: "skipped",
+    extended_message: null,
+    extended_hint: null,
     ...overrides,
   };
 }
@@ -87,6 +90,13 @@ export function finding(overrides: Partial<FindingOut> = {}): FindingOut {
     last_imported_at: null,
     not_rechecked: false,
     score_basis: "context adjusted",
+    score_breakdown: {
+      base: 70,
+      base_source: "cloudshield",
+      adjustments: 25,
+      capped: false,
+      basis: "context adjusted",
+    },
     merged_into: null,
     corroborated_by: [],
     tools_disagree: false,
@@ -169,24 +179,8 @@ export function fix(overrides: Partial<FixOut> = {}): FixOut {
   return {
     finding_id: "F-CIS-SG-001-aaaaaaaa",
     evidence_hash: "abc",
-    blast_radius: {
-      level: "medium",
-      factors: [
-        {
-          fact: "Running instances using this group",
-          value: ["i-1"],
-          source: "resources of type EC2",
-          certainty: "verified",
-        },
-        {
-          fact: "Who connects to these ports",
-          value: null,
-          source: "flow logs are not collected",
-          certainty: "unknown",
-        },
-      ],
-      notes: ["Use SSM Session Manager instead of SSH."],
-    },
+    not_checked: ["Who connects to these ports"],
+    cloudshield_steps: null,
     patches: [
       {
         format: "terraform",
