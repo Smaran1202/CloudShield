@@ -293,9 +293,7 @@ def create_fix(
 
 
 @router.get("/findings/{finding_id}/fix", response_model=FixOut)
-def get_stored_fix(
-    finding_id: str, session: Annotated[Session, Depends(get_session)]
-) -> FixOut:
+def get_stored_fix(finding_id: str, session: Annotated[Session, Depends(get_session)]) -> FixOut:
     fix = session.get(FixRow, (ACCOUNT_ID, finding_id))
     finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
     if fix is None or finding is None:

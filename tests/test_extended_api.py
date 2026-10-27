@@ -430,7 +430,7 @@ def test_the_migration_keeps_earlier_scans_and_imports(tmp_path, monkeypatch):
                 "regions_covered, checks_covered) values (1, 'prowler', 'abc', "
                 "'2026-10-02 00:00:00', "
                 '\'{"imported": 2, "already_seen": 0, "resolved": 0, "rejected": 0, '
-                '"ignored": 0}\', \'[]\', \'[]\')'
+                "\"ignored\": 0}', '[]', '[]')"
             )
         )
 

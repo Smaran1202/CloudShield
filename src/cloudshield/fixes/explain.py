@@ -24,7 +24,7 @@ SYSTEM_INSTRUCTION = (
     "given. Do not write code, commands or configuration. Do not mention any resource id, ARN, "
     "address range or port that is not in the data. Cite the evidence items you rely on by their "
     "ids (e1, e2, ...). In what_could_break, use only the evidence and the pre_checks, and say "
-    "what CloudShield did not check, using the not_checked list and the words \"did not check\". "
+    'what CloudShield did not check, using the not_checked list and the words "did not check". '
     "Never say that a change is safe, harmless or low risk. Keep each field to two or three "
     "sentences."
 )
