@@ -299,7 +299,6 @@ def test_startup_fails_leftover_queued_and_running_scans_and_a_new_scan_works(tm
         wait_until_free(app.state.job_lock)
 
 
-
 def test_the_lock_is_held_until_import_then_release_returns(tmp_path, monkeypatch):
     client = make_client(tmp_path)
     lock = client.app.state.job_lock
