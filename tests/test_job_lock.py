@@ -1,10 +1,7 @@
-import asyncio
-import contextlib
 import threading
 import time
 
 import pytest
-from fastapi import Request
 from fastapi.testclient import TestClient
 from prowler_data import entry, to_bytes
 from sqlalchemy.exc import OperationalError
@@ -223,7 +220,6 @@ def status_of(factory, scan_id) -> str:
 
 def test_a_failure_in_mark_running_fails_the_scan_and_frees_the_lock(tmp_path, monkeypatch):
     factory, scan_id, lock = make_job(tmp_path)
-    real = store.mark_running
     calls = []
 
     def broken(session, sid):
@@ -239,7 +235,9 @@ def test_a_failure_in_mark_running_fails_the_scan_and_frees_the_lock(tmp_path, m
     assert lock.holder is None
 
 
-def test_a_failure_in_mark_failed_still_fails_the_scan_and_frees_the_lock(tmp_path, monkeypatch):
+def test_a_failure_in_mark_failed_still_fails_the_scan_and_keeps_the_real_error(
+    tmp_path, monkeypatch
+):
     factory, scan_id, lock = make_job(tmp_path)
     real = store.mark_failed
     calls = []
@@ -259,6 +257,9 @@ def test_a_failure_in_mark_failed_still_fails_the_scan_and_frees_the_lock(tmp_pa
 
     assert len(calls) == 2
     assert status_of(factory, scan_id) == "failed"
+    with factory() as session:
+        stored = session.get(ScanRow, scan_id).failure_message
+    assert stored == "RuntimeError: no credentials"
     assert lock.holder is None
 
 
@@ -298,48 +299,57 @@ def test_startup_fails_leftover_queued_and_running_scans_and_a_new_scan_works(tm
         wait_until_free(app.state.job_lock)
 
 
-def test_the_lock_is_held_until_the_import_ends_even_if_the_client_disconnects(
-    tmp_path, monkeypatch
-):
+
+def test_the_lock_is_held_until_import_then_release_returns(tmp_path, monkeypatch):
     client = make_client(tmp_path)
-    app = client.app
-    lock = app.state.job_lock
+    lock = client.app.state.job_lock
     started, finish = threading.Event(), threading.Event()
 
     def held_open(session_factory, raw, file_name):
         started.set()
         finish.wait(5)
-        return {}
+        return {"done": True}
 
     monkeypatch.setattr(routes, "import_upload", held_open)
-    body = to_bytes([entry()])
+    assert lock.take("import") is None
+    results = []
+    worker = threading.Thread(
+        target=lambda: results.append(routes.import_then_release(lock, None, b"", None))
+    )
+    worker.start()
+    assert started.wait(5)
 
-    async def receive():
-        return {"type": "http.request", "body": body, "more_body": False}
+    reply = start_scan(client)
 
-    scope = {
-        "type": "http",
-        "method": "POST",
-        "headers": [(b"content-type", b"application/json")],
-        "app": app,
-    }
-
-    async def scenario():
-        task = asyncio.create_task(routes.upload_prowler(Request(scope, receive), None))
-        await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
-        task.cancel()
-        await asyncio.sleep(0.05)
-        refused = start_scan(client).status_code
-        holder = lock.holder
-        finish.set()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
-        return refused, holder
-
-    refused, holder = asyncio.run(scenario())
-
-    assert refused == 409
-    assert holder == "import"
+    assert reply.status_code == 409
+    assert lock.holder == "import"
+    finish.set()
+    worker.join(5)
+    assert results == [{"done": True}]
+    assert lock.holder is None
+    assert start_scan(client).status_code == 202
     wait_until_free(lock)
+
+
+def test_a_scan_is_failed_not_queued_when_its_thread_cannot_start(tmp_path, monkeypatch):
+    client = make_client(tmp_path)
+    lock = client.app.state.job_lock
+    real_thread = threading.Thread
+
+    class CannotStart(real_thread):
+        def start(self):
+            if self._target is routes.run_scan_job:
+                raise RuntimeError("can't start new thread")
+            super().start()
+
+    monkeypatch.setattr(threading, "Thread", CannotStart)
+    with pytest.raises(RuntimeError, match="can't start new thread"):
+        start_scan(client)
+    monkeypatch.undo()
+
+    scans = client.get("/api/scans").json()
+    assert [s["status"] for s in scans] == ["failed"]
+    assert "can't start new thread" in scans[0]["failure_message"]
+    assert lock.holder is None
     assert start_scan(client).status_code == 202
     wait_until_free(lock)

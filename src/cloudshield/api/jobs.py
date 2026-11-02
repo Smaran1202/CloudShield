@@ -57,6 +57,7 @@ def run_scan_job(
     extended_function: Callable[[list[str]], RunOutput] | None = None,
     job_lock: JobLock | None = None,
 ) -> None:
+    message = None
     try:
         with session_factory() as session:
             try:
@@ -76,15 +77,17 @@ def run_scan_job(
             except Exception as exc:
                 # The scan runs in a background thread, so the error has to be recorded on the
                 # scan row for the user to see it.
+                message = f"{type(exc).__name__}: {exc}"
                 session.rollback()
                 logger.exception("Scan %s failed", scan_id)
-                store.mark_failed(session, scan_id, f"{type(exc).__name__}: {exc}")
+                store.mark_failed(session, scan_id, message)
     except Exception as exc:
         # Recording the failure failed too (for example "database is locked"). Try once more on
-        # a fresh connection so the scan is not left queued or running.
+        # a fresh connection so the scan is not left queued or running. The scan's own error
+        # text is kept; this one is only used when the scan itself had not failed yet.
         logger.exception("Scan %s could not be marked failed", scan_id)
         with session_factory() as fresh:
-            store.mark_failed(fresh, scan_id, f"{type(exc).__name__}: {exc}")
+            store.mark_failed(fresh, scan_id, message or f"{type(exc).__name__}: {exc}")
     finally:
         # The lock was taken when the scan started and covers the extended stage and its import.
         if job_lock is not None:

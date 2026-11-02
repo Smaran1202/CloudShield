@@ -1,3 +1,4 @@
+import logging
 import threading
 from dataclasses import dataclass
 from datetime import datetime, time
@@ -55,6 +56,7 @@ from cloudshield.imports.upload import ImportBusy, import_upload
 from cloudshield.risk.environment import environment_score, severity_counts
 from cloudshield.risk.scoring import score_breakdown
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
@@ -117,6 +119,7 @@ def start_scan(
     if held is not None:
         raise HTTPException(status_code=409, detail=busy_message(held))
     # From here the job thread releases the lock when the scan ends.
+    scan = None
     try:
         if store.active_scan(session) is not None:
             raise HTTPException(status_code=409, detail="A scan is already running.")
@@ -124,7 +127,14 @@ def start_scan(
         extended = state.extended_function if body and body.extended else None
         args = (state.session_factory, scan.id, regions, state.scan_function, extended)
         threading.Thread(target=run_scan_job, args=(*args, state.job_lock), daemon=True).start()
-    except Exception:
+    except Exception as exc:
+        if scan is not None:
+            # No job will run for this scan, so it must not stay queued and block the next one.
+            try:
+                session.rollback()
+                store.mark_failed(session, scan.id, f"{type(exc).__name__}: {exc}")
+            except Exception:
+                logger.exception("Scan %s could not be marked failed", scan.id)
         state.job_lock.release()
         raise
     return scan

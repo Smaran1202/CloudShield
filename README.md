@@ -57,8 +57,12 @@ in `AWS_REGION`, or the regions sent with the scan request:
 .\.venv\Scripts\Activate.ps1
 $env:AWS_PROFILE = "your-profile"
 $env:AWS_REGION = "us-east-1"
-python -m uvicorn cloudshield.api.app:create_app --factory --port 8000
+python -m uvicorn cloudshield.api.app:create_app --factory --host 127.0.0.1 --port 8000
 ```
+
+> **Warning: run the server only on localhost.** There is no login yet. Never use
+> `--host 0.0.0.0` and never expose the port. Anyone who can reach it can start scans with the
+> server's AWS credentials, read all findings, upload files and dismiss findings.
 
 Start a scan and read the results:
 

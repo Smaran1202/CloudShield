@@ -57,7 +57,9 @@
   its extended checks and their import. The lock lives in the server process only, so the
   command-line import (`python -m cloudshield.imports`) is not covered: do not run it while a
   scan is running. SQLite waits up to 5 seconds for another writer before it fails.
-- There are no accounts or logins yet; every row has `account_id` "local".
+- There are no accounts or logins yet; every row has `account_id` "local". Run the server only on
+  localhost: anyone who can reach the port can start scans with the server's AWS credentials, read
+  all findings, upload files and dismiss findings.
 
 ## Risk scores
 
