@@ -59,6 +59,7 @@ describe("Overview: headline and counts", () => {
   const rows = [
     ...many(2, 90),
     ...many(1, 70, { source: "prowler" }),
+    ...many(2, 40),
     finding({ finding_id: "i", severity: "INFO", risk_score: null, title: "Info" }),
     finding({ finding_id: "x", dismissed: true, title: "Dismissed one" }),
     finding({ finding_id: "m", merged_into: "F-90-0", title: "Merged one" }),
@@ -66,46 +67,57 @@ describe("Overview: headline and counts", () => {
   ];
   const routes = { "GET /api/scans": [scan()], "GET /api/findings": rows };
 
-  it("counts to go without informational, dismissed or merged findings", async () => {
+  it("counts only the Fix now findings, not informational, dismissed or merged ones", async () => {
     renderApp("/", routes);
 
     const headline = await screen.findByRole("heading", { level: 1 });
 
-    expect(within(headline).getByText("3 to go.")).toBeInTheDocument();
+    expect(within(headline).getByText("2 to fix now.")).toBeInTheDocument();
     expect(within(headline).getByText("1 fixed.")).toBeInTheDocument();
   });
 
-  it("splits them by source, informational and dismissed, in one line", async () => {
+  it("splits the rest by lane, informational and dismissed, and then by source", async () => {
     renderApp("/", routes);
 
-    const line = await screen.findByTestId("source-counts");
-
-    expect(line).toHaveTextContent(
-      "2 found by CloudShield, 1 imported, 1 informational, 1 dismissed",
+    expect(await screen.findByTestId("lane-counts")).toHaveTextContent(
+      "1 next, 2 later, 1 informational, 1 dismissed.",
+    );
+    expect(screen.getByTestId("source-counts")).toHaveTextContent(
+      "4 found by CloudShield, 1 imported.",
     );
   });
 
   it("links each part to the Findings filter that shows exactly those findings", async () => {
     renderApp("/", routes);
 
-    const line = await screen.findByTestId("source-counts");
-    const links = within(line).getAllByRole("link");
+    const lanes = await screen.findByTestId("lane-counts");
+    const sources = screen.getByTestId("source-counts");
+    const hrefs = (line: HTMLElement) =>
+      within(line)
+        .getAllByRole("link")
+        .map((l) => l.getAttribute("href"));
 
-    expect(links.map((l) => l.getAttribute("href"))).toEqual([
-      "/findings?source=cloudshield&info=hide",
-      "/findings?source=prowler&info=hide",
+    expect(hrefs(lanes)).toEqual([
+      "/findings?lane=next",
+      "/findings?lane=later",
       "/findings?info=only",
       "/findings?lane=dismissed",
+    ]);
+    expect(hrefs(sources)).toEqual([
+      "/findings?source=cloudshield&info=hide",
+      "/findings?source=prowler&info=hide",
     ]);
   });
 
   it("makes each link open a list as long as the number it was clicked on", async () => {
     const all = { ...routes, "GET /api/findings": rows };
     for (const [path, shown] of [
-      ["/findings?source=cloudshield&info=hide", "Showing 2 of 7"],
-      ["/findings?source=prowler&info=hide", "Showing 1 of 7"],
-      ["/findings?info=only", "Showing 1 of 7"],
-      ["/findings?lane=dismissed", "Showing 1 of 7"],
+      ["/findings?lane=next", "Showing 1 of 9"],
+      ["/findings?lane=later", "Showing 2 of 9"],
+      ["/findings?info=only", "Showing 1 of 9"],
+      ["/findings?lane=dismissed", "Showing 1 of 9"],
+      ["/findings?source=cloudshield&info=hide", "Showing 4 of 9"],
+      ["/findings?source=prowler&info=hide", "Showing 1 of 9"],
     ]) {
       const { unmount } = renderApp(path, all) as unknown as { unmount?: () => void };
       expect(await screen.findByText(new RegExp(shown))).toBeInTheDocument();
@@ -130,6 +142,26 @@ describe("Overview: headline and counts", () => {
       "href",
       "/findings?lane=now",
     );
+  });
+
+  it("makes the headline number equal the Fix now tiles when nothing overflows", async () => {
+    renderApp("/", { ...routes, "GET /api/findings": many(3, 90) });
+
+    const lane = await screen.findByRole("region", { name: "Fix now" });
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("3 to fix now.");
+    expect(within(lane).getAllByRole("heading", { level: 3 })).toHaveLength(3);
+    expect(within(lane).queryByRole("link", { name: /See all/ })).not.toBeInTheDocument();
+  });
+
+  it("makes the headline number equal the See all number when tiles overflow", async () => {
+    renderApp("/", { ...routes, "GET /api/findings": many(8, 90) });
+
+    const lane = await screen.findByRole("region", { name: "Fix now" });
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("8 to fix now.");
+    expect(within(lane).getAllByRole("heading", { level: 3 })).toHaveLength(5);
+    expect(within(lane).getByRole("link", { name: /See all 8/ })).toBeInTheDocument();
   });
 
   it("opens a Findings list for See all with as many findings as the lane count", async () => {

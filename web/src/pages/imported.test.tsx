@@ -192,17 +192,33 @@ describe("Overview: lanes show at most five tiles", () => {
       "href",
       "/findings?lane=next",
     );
-    expect(within(later).getByRole("link", { name: /See all 6/ })).toHaveAttribute(
-      "href",
-      "/findings?lane=later",
-    );
+    expect(
+      within(later).getByRole("link", { name: /6 findings across 1 check/ }),
+    ).toHaveAttribute("href", "/findings?lane=later");
+    expect(
+      within(later).queryByRole("link", { name: /See all/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("counts the distinct checks in the Later link", async () => {
+    const mixed = [
+      ...many(4, 50),
+      ...many(2, 40).map((f) => ({ ...f, rule_id: "CIS-S3-003" })),
+    ];
+    renderApp("/", routes(mixed));
+
+    const later = await screen.findByRole("region", { name: "Later" });
+
+    expect(
+      within(later).getByRole("link", { name: /6 findings across 2 checks/ }),
+    ).toBeInTheDocument();
   });
 
   it("counts the open findings by source", async () => {
     renderApp("/", routes([own, imported, { ...imported, finding_id: "F-2" }]));
 
     expect(await screen.findByTestId("source-counts")).toHaveTextContent(
-      "1 found by CloudShield, 2 imported",
+      "1 found by CloudShield, 2 imported.",
     );
   });
 

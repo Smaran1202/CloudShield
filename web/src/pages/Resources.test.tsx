@@ -139,7 +139,12 @@ describe("Resources", () => {
   });
 
   it("shows the type with an icon and the last seen time of the scan that saw it", async () => {
-    renderApp("/resources", listRoutes);
+    // Built from now, so the test does not depend on today's date.
+    const finishedAt = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    renderApp("/resources", {
+      ...listRoutes,
+      "GET /api/scans": [scan({ id: 1, finished_at: finishedAt })],
+    });
 
     const row = (await screen.findByRole("link", { name: "web" })).closest(
       "[role=row]",
@@ -148,7 +153,7 @@ describe("Resources", () => {
 
     expect(cells[1].querySelector("svg[data-icon]")).not.toBeNull();
     expect(cells[1]).toHaveTextContent("Security Group");
-    expect(cells[5]).toHaveAttribute("title", formatDate("2026-10-01T10:00:42Z"));
+    expect(cells[5]).toHaveAttribute("title", formatDate(finishedAt));
     expect(cells[5].textContent).toMatch(/ago|just now/);
   });
 

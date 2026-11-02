@@ -439,7 +439,11 @@ describe("Fix page: verify an imported finding with a full scan", () => {
       [`GET ${path}`]: () => (++reads === 1 ? imported : never()),
     });
 
-    await waitFor(() => expect(reads).toBe(2));
+    // Reads: the page load, the page's own refresh when the scan ends, and the verify fetch.
+    // Wait for all three, give a stray extra read time to show up, then check the count stayed.
+    await waitFor(() => expect(reads).toBeGreaterThanOrEqual(3));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(reads).toBe(3);
 
     expect(screen.queryByText("Resolved.")).not.toBeInTheDocument();
     expect(screen.queryByText(/Still open/)).not.toBeInTheDocument();

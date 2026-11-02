@@ -78,7 +78,7 @@ describe("Overview: before a scan", () => {
     expect(await screen.findByText("No scan yet. Run a scan.")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Fix now" })).not.toBeInTheDocument();
     expect(screen.queryByText(/fixed\./)).not.toBeInTheDocument();
-    expect(screen.queryByText(/to go\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/to fix now\./)).not.toBeInTheDocument();
     expect(callsTo("GET", "/api/findings")).toHaveLength(0);
     expect(callsTo("GET", "/api/risk/summary")).toHaveLength(0);
   });
@@ -97,12 +97,38 @@ describe("Overview: before a scan", () => {
 });
 
 describe("Overview: the hero", () => {
-  it("counts the fixed and the open findings in the headline", async () => {
+  it("counts the fixed findings and the ones in Fix now in the headline", async () => {
     renderApp("/", results);
 
     const headline = await screen.findByRole("heading", { level: 1 });
     expect(within(headline).getByText("2 fixed.")).toBeInTheDocument();
-    expect(within(headline).getByText("5 to go.")).toBeInTheDocument();
+    expect(within(headline).getByText("2 to fix now.")).toBeInTheDocument();
+  });
+
+  it("says how many are in Next and Later, how many are informational and how many are dismissed", async () => {
+    renderApp("/", results);
+
+    const line = await screen.findByTestId("lane-counts");
+
+    expect(line).toHaveTextContent("1 next, 2 later, 1 informational, 0 dismissed.");
+    expect(
+      within(line)
+        .getAllByRole("link")
+        .map((l) => l.getAttribute("href")),
+    ).toEqual([
+      "/findings?lane=next",
+      "/findings?lane=later",
+      "/findings?info=only",
+      "/findings?lane=dismissed",
+    ]);
+  });
+
+  it("leaves out the source counts when nothing is imported", async () => {
+    renderApp("/", results);
+
+    await screen.findByTestId("lane-counts");
+
+    expect(screen.queryByTestId("source-counts")).not.toBeInTheDocument();
   });
 
   it("says to start with the highest-risk open finding", async () => {
@@ -189,7 +215,7 @@ describe("Overview: the hero", () => {
     });
 
     expect(await screen.findByText("Nothing is open.")).toBeInTheDocument();
-    expect(screen.getByText("0 to go.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing to fix now.")).toBeInTheDocument();
   });
 });
 
@@ -440,6 +466,20 @@ describe("Overview: below the lanes", () => {
     expect(screen.queryByText(/Combined environment score/)).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     expect(callsTo("GET", "/api/risk/summary")).toHaveLength(0);
+  });
+
+  it("shows the same score in the footer as on the Fix next card, even when the top finding is suggested as not applicable", async () => {
+    const skipped = row("S", 99, {
+      suggested_not_applicable: { reason: "AWS owns this policy." },
+    });
+    renderApp("/", { ...results, "GET /api/findings": [skipped, ...rows] });
+
+    const card = await screen.findByRole("region", { name: "Fix next" });
+    const label = screen.getByText("Highest open risk");
+
+    expect(card.querySelector('[data-lane="now"]')).toHaveTextContent("95");
+    expect(label.closest("div")).toHaveTextContent("95");
+    expect(label.closest("div")).not.toHaveTextContent("99");
   });
 
   it("shows the backend's message when the findings cannot be loaded", async () => {

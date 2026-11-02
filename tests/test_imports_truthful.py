@@ -32,10 +32,14 @@ ALL_ON = {name: True for name in ALL_OFF}
 KMS = [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "aws:kms"}}]
 BLOCK_CHECK = "s3_bucket_level_public_access_block"
 VERSIONING_CHECK = "s3_bucket_object_versioning"
+KMS_CHECK = "s3_bucket_kms_encryption"
+RATES = "The imported scan rates this MEDIUM"
+AES = [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]
 INFO_ENTRY = entry(
     check="info", uid=GROUP_ARN, group="ec2", severity="Informational", severity_id=1
 )
 IMPORTED_BLOCK = make_finding_id(f"PRW-{BLOCK_CHECK}", "my-bucket")
+IMPORTED_KMS = make_finding_id(f"PRW-{KMS_CHECK}", "my-bucket")
 
 
 def make_client(tmp_path) -> TestClient:
@@ -44,10 +48,10 @@ def make_client(tmp_path) -> TestClient:
     return TestClient(create_app(database_url=url, load_env=False))
 
 
-def bucket(block=ALL_OFF, versioning="Enabled") -> dict:
+def bucket(block=ALL_OFF, versioning="Enabled", encryption=KMS) -> dict:
     attributes = {
         "public_access_block": block,
-        "encryption": KMS,
+        "encryption": encryption,
         "versioning": versioning,
         "policy": None,
     }
@@ -227,11 +231,94 @@ def test_the_refresh_command_works_on_a_file_that_was_already_imported(
 # 3. Merging duplicates
 
 
-def test_the_mapping_has_only_the_two_confirmed_pairs():
-    assert mapping.SAME_CHECK == {
+def test_the_mapping_has_only_the_three_confirmed_pairs():
+    assert {check: pair.rule for check, pair in mapping.SAME_CHECK.items()} == {
         "s3_bucket_level_public_access_block": "CIS-S3-001",
         "s3_bucket_object_versioning": "CIS-S3-003",
+        "s3_bucket_kms_encryption": "CIS-S3-002",
     }
+
+
+def test_every_pair_names_the_attribute_it_needs_from_our_scan():
+    for pair in mapping.SAME_CHECK.values():
+        assert pair.needs
+
+
+def test_the_kms_pair_merges_and_explains_the_different_ratings(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket(block=ALL_ON, encryption=AES)])
+
+    load(client, [entry(check=KMS_CHECK, severity="Medium")])
+
+    ours = by_rule(client, "CIS-S3-002")
+    assert [f["rule_id"] for f in listed(client)] == ["CIS-S3-002"]
+    assert ours["severity"] == "INFO"
+    assert ours["corroborated_by"][0]["check_id"] == KMS_CHECK
+    rating = ours["evidence"]["items"][-1]
+    assert rating["fact"] == (
+        "The imported scan rates this MEDIUM; CloudShield rates it informational "
+        "because S3 encrypts every bucket by default."
+    )
+    assert rating["certainty"] == "reported"
+    merged = client.get(f"/api/findings/{IMPORTED_KMS}").json()
+    assert merged["merged_into"] == ours["finding_id"]
+
+    scan(client, [bucket(block=ALL_ON, encryption=AES)])
+    load(client, [entry(check=KMS_CHECK, severity="Medium", title="Other title")])
+
+    again = by_rule(client, "CIS-S3-002")
+    assert [f for f in facts(again) if f.startswith(RATES)] == [rating["fact"]]
+    assert facts(again).count("Also reported by an imported scan") == 1
+
+
+def test_the_kms_pair_adds_no_rating_note_when_the_import_is_informational_too(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket(block=ALL_ON, encryption=AES)])
+
+    load(client, [entry(check=KMS_CHECK, severity="Informational", severity_id=1)])
+
+    ours = by_rule(client, "CIS-S3-002")
+    assert ours["corroborated_by"][0]["check_id"] == KMS_CHECK
+    assert [f for f in facts(ours) if f.startswith(RATES)] == []
+
+
+def test_the_kms_pair_does_not_merge_when_the_encryption_is_unknown(tmp_path):
+    client = make_client(tmp_path)
+    attributes = {"public_access_block": ALL_ON, "versioning": "Enabled", "policy": None}
+    scan(client, [make_resource("my-bucket", "S3", "ap-southeast-2", "my-bucket", attributes)])
+
+    load(client, [entry(check=KMS_CHECK)])
+
+    theirs = by_rule(client, f"PRW-{KMS_CHECK}")
+    assert theirs["merged_into"] is None
+    assert theirs["tools_disagree"] is False
+    assert NOT_COMPARED in facts(theirs)
+
+
+def test_the_kms_pair_does_not_merge_after_a_scan_error(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket(block=ALL_ON, encryption=AES)], errors=S3_ERROR)
+
+    load(client, [entry(check=KMS_CHECK)])
+
+    ours = by_rule(client, "CIS-S3-002")
+    theirs = by_rule(client, f"PRW-{KMS_CHECK}")
+    assert theirs["merged_into"] is None
+    assert ours["corroborated_by"] == []
+    assert NOT_COMPARED in facts(ours)
+    assert NOT_COMPARED in facts(theirs)
+
+
+def test_the_kms_pair_flags_a_disagreement_when_ours_passes_and_the_import_fails(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket(block=ALL_ON)])
+
+    load(client, [entry(check=KMS_CHECK)])
+
+    theirs = by_rule(client, f"PRW-{KMS_CHECK}")
+    assert theirs["tools_disagree"] is True
+    assert theirs["merged_into"] is None
+    assert theirs["status"] == "OPEN"
 
 
 def test_when_both_report_the_same_thing_ours_stays_and_the_imported_one_is_merged(tmp_path):

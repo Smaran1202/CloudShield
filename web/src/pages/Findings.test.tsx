@@ -297,12 +297,16 @@ describe("Findings: page", () => {
   });
 
   it("shows last seen as a relative time with the full date as its tooltip", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    // Built from now, so the test does not depend on today's date.
+    const lastSeen = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+    renderApp("/findings", {
+      "GET /api/findings": [finding({ last_seen_at: lastSeen })],
+    });
 
     const first = (await screen.findAllByRole("row"))[1];
     const seen = within(first).getAllByRole("cell")[5];
 
-    expect(seen).toHaveAttribute("title", formatDate("2026-10-01T10:00:42Z"));
+    expect(seen).toHaveAttribute("title", formatDate(lastSeen));
     expect(seen.textContent).toMatch(/ago|just now|yesterday|in /);
   });
 

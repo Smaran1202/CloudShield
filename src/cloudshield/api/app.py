@@ -8,7 +8,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from cloudshield.api.jobs import scan_with_boto3
+from cloudshield.api.jobs import JobLock, scan_with_boto3
 from cloudshield.api.routes import router
 from cloudshield.config import Settings, load_env_file
 from cloudshield.db import store
@@ -48,8 +48,7 @@ def create_app(
     engine = make_engine(database_url or settings.database_url)
     app.state.session_factory = make_session_factory(engine)
     app.state.scan_function = scan_function or scan_with_boto3
-    app.state.scan_lock = threading.Lock()
-    app.state.import_lock = threading.Lock()
+    app.state.job_lock = JobLock()
     app.state.ai_limit = HourlyLimit(settings.ai_max_calls_per_hour)
     app.state.gemini_transport = gemini_transport
     app.state.extended_cancel = threading.Event()

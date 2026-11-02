@@ -144,12 +144,12 @@ def test_a_streamed_body_over_the_limit_is_refused_with_413_while_reading(tmp_pa
 
 def test_a_second_import_while_one_is_running_is_refused_with_409(tmp_path):
     client = make_client(tmp_path)
-    client.app.state.import_lock.acquire()
+    assert client.app.state.job_lock.take("import") is None
 
     reply = upload(client, fixture_file())
 
     assert reply.status_code == 409
-    assert "Another import" in reply.json()["detail"]
+    assert reply.json()["detail"] == "An import is running."
     assert client.get("/api/imports").json() == []
 
 

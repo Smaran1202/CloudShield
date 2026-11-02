@@ -21,6 +21,7 @@ import {
   countLanes,
   inLane,
   isActive,
+  isDismissed,
   LANE_DOT,
   LANE_NAME,
   LANES,
@@ -76,7 +77,7 @@ function readFilters(params: URLSearchParams): Filters {
 function inChosenLane(row: FindingOut, lane: Filters["lane"]): boolean {
   if (lane === "all") return true;
   if (lane === "open") return isActive(row);
-  if (lane === "dismissed") return row.status === "OPEN" && row.dismissed;
+  if (lane === "dismissed") return isDismissed(row);
   return inLane([row], lane).length === 1;
 }
 

@@ -11,7 +11,8 @@ from cloudshield.imports.recheck import resolve_gone_resources
 from cloudshield.risk.environment import environment_score, severity_counts
 
 # The scanner service that has to run without errors before a finding of this type can be
-# called fixed.
+# called fixed. imports/recheck.py has its own tables for a different question (is the resource
+# gone?) and leaves IAM Role out of them; this table, for own findings, includes it.
 SERVICE_OF = {
     "S3": "s3",
     "EC2": "ec2",

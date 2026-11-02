@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   byScoreDescending,
   countLanes,
-  highestRiskOpen,
+  inLane,
   LANE_HINT,
   LANE_THRESHOLDS,
   laneOf,
   shortResource,
+  startWith,
 } from "./lanes";
 import { finding } from "./test/factories";
 
@@ -41,6 +42,7 @@ describe("laneOf", () => {
     expect(LANE_HINT.now).toBe("Risk score 80 or more");
     expect(LANE_HINT.next).toBe("Risk score 60 to 79");
     expect(LANE_HINT.later).toBe("Risk score below 60, or no score");
+    expect(LANE_HINT.done).toBe("Resolved by a rescan or a newer import");
   });
 });
 
@@ -59,21 +61,77 @@ describe("countLanes", () => {
   });
 });
 
-describe("highestRiskOpen", () => {
-  it("is the open finding with the highest score, ignoring resolved and unscored ones", () => {
+describe("startWith", () => {
+  it("is the highest score among findings that are not dismissed or suggested as not applicable", () => {
     const rows = [
-      finding({ finding_id: "F-1", risk_score: 70 }),
-      finding({ finding_id: "F-2", risk_score: 99, status: "RESOLVED" }),
-      finding({ finding_id: "F-3", risk_score: 85 }),
-      finding({ finding_id: "F-4", risk_score: null, severity: "INFO" }),
+      finding({ finding_id: "A", risk_score: 99, dismissed: true }),
+      finding({
+        finding_id: "B",
+        risk_score: 95,
+        suggested_not_applicable: { reason: "AWS owns this policy." },
+      }),
+      finding({ finding_id: "C", risk_score: 90, merged_into: "D" }),
+      finding({ finding_id: "D", risk_score: 85 }),
+      finding({ finding_id: "E", risk_score: 70 }),
     ];
 
-    expect(highestRiskOpen(rows)?.finding_id).toBe("F-3");
+    expect(startWith(rows)?.finding_id).toBe("D");
   });
 
-  it("is null when nothing scored is open", () => {
-    expect(highestRiskOpen([finding({ risk_score: null })])).toBeNull();
-    expect(highestRiskOpen([])).toBeNull();
+  it("falls back to Next when nothing is in Fix now", () => {
+    const rows = [
+      finding({ finding_id: "A", risk_score: 50 }),
+      finding({ finding_id: "B", risk_score: 65 }),
+    ];
+
+    expect(startWith(rows)?.finding_id).toBe("B");
+    expect(countLanes(rows).now).toBe(0);
+  });
+
+  it("puts a CloudShield finding before an imported one on a tie", () => {
+    const rows = [
+      finding({ finding_id: "I", risk_score: 85, source: "prowler", rule_id: "A-first" }),
+      finding({
+        finding_id: "O",
+        risk_score: 85,
+        source: "cloudshield",
+        rule_id: "Z-last",
+      }),
+    ];
+
+    expect(startWith(rows)?.finding_id).toBe("O");
+  });
+
+  it("ignores resolved and unscored findings", () => {
+    const rows = [
+      finding({ finding_id: "F-1", risk_score: 99, status: "RESOLVED" }),
+      finding({ finding_id: "F-2", risk_score: null, severity: "INFO" }),
+      finding({ finding_id: "F-3", risk_score: 40 }),
+    ];
+
+    expect(startWith(rows)?.finding_id).toBe("F-3");
+  });
+
+  it("is null when nothing scored is left", () => {
+    expect(startWith([finding({ risk_score: null })])).toBeNull();
+    expect(startWith([])).toBeNull();
+  });
+});
+
+describe("Fix now count", () => {
+  it("is the number of open, undismissed, unmerged, scored findings at 80 or more, from any source", () => {
+    const rows = [
+      finding({ finding_id: "A", risk_score: 80 }),
+      finding({ finding_id: "B", risk_score: 99, source: "prowler" }),
+      finding({ finding_id: "C", risk_score: 79 }),
+      finding({ finding_id: "D", risk_score: 90, dismissed: true }),
+      finding({ finding_id: "E", risk_score: 90, merged_into: "A" }),
+      finding({ finding_id: "F", risk_score: 90, status: "RESOLVED" }),
+      finding({ finding_id: "G", risk_score: null, severity: "INFO" }),
+    ];
+
+    expect(countLanes(rows).now).toBe(2);
+    expect(inLane(rows, "now")).toHaveLength(2);
   });
 });
 

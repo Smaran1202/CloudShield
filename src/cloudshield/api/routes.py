@@ -8,7 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from cloudshield.api.jobs import run_scan_job
+from cloudshield.api.jobs import JobLock, busy_message, run_scan_job
 from cloudshield.api.schemas import (
     CloudShieldSteps,
     DispositionIn,
@@ -113,14 +113,20 @@ def start_scan(
             detail='No regions. Send {"regions": [...]} or set AWS_REGION on the server.',
         )
 
-    with state.scan_lock:
+    held = state.job_lock.take("scan")
+    if held is not None:
+        raise HTTPException(status_code=409, detail=busy_message(held))
+    # From here the job thread releases the lock when the scan ends.
+    try:
         if store.active_scan(session) is not None:
             raise HTTPException(status_code=409, detail="A scan is already running.")
         scan = store.create_scan(session, regions)
-
-    extended = state.extended_function if body and body.extended else None
-    args = (state.session_factory, scan.id, regions, state.scan_function, extended)
-    threading.Thread(target=run_scan_job, args=args, daemon=True).start()
+        extended = state.extended_function if body and body.extended else None
+        args = (state.session_factory, scan.id, regions, state.scan_function, extended)
+        threading.Thread(target=run_scan_job, args=(*args, state.job_lock), daemon=True).start()
+    except Exception:
+        state.job_lock.release()
+        raise
     return scan
 
 
@@ -378,6 +384,13 @@ async def read_limited_body(request: Request) -> bytes:
     return bytes(body)
 
 
+def import_then_release(lock: JobLock, session_factory, raw: bytes, file_name: str | None) -> dict:
+    try:
+        return import_upload(session_factory, raw, file_name)
+    finally:
+        lock.release()
+
+
 @router.post("/imports/prowler", response_model=ImportResultOut)
 async def upload_prowler(
     request: Request, x_filename: Annotated[str | None, Header()] = None
@@ -385,13 +398,19 @@ async def upload_prowler(
     """Imports a results file sent from the dashboard. The reply holds counts only."""
     if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
         raise HTTPException(status_code=415, detail="Send the file as application/json.")
-    lock = request.app.state.import_lock
-    if not lock.acquire(blocking=False):
-        raise HTTPException(status_code=409, detail="Another import is running. Wait for it.")
+    lock = request.app.state.job_lock
+    held = lock.take("import")
+    if held is not None:
+        raise HTTPException(status_code=409, detail=busy_message(held))
     try:
         raw = await read_limited_body(request)
+    except BaseException:
+        lock.release()
+        raise
+    # From here the import thread releases the lock when it ends, even if the client has gone.
+    try:
         return await run_in_threadpool(
-            import_upload, request.app.state.session_factory, raw, x_filename
+            import_then_release, lock, request.app.state.session_factory, raw, x_filename
         )
     except AlreadyImported as exc:
         raise HTTPException(status_code=409, detail=redact(str(exc))) from exc
@@ -399,8 +418,6 @@ async def upload_prowler(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ImportRejected as exc:
         raise HTTPException(status_code=422, detail=redact(str(exc))) from exc
-    finally:
-        lock.release()
 
 
 @router.get("/resources/imported", response_model=list[ImportedResourceOut])

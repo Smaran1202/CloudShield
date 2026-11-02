@@ -14,6 +14,11 @@ export function isActive(finding: Placed): boolean {
   return finding.status === "OPEN" && !finding.dismissed && !finding.merged_into;
 }
 
+// A finding the owner set aside: open, dismissed, and not merged into another.
+export function isDismissed(finding: Placed): boolean {
+  return finding.status === "OPEN" && !!finding.dismissed && !finding.merged_into;
+}
+
 // Open findings are placed by risk score. A finding with no score (INFO) goes to Later.
 // A resolved finding is Done, whatever its last score was.
 export function laneOf(finding: Pick<FindingOut, "status" | "risk_score">): Lane {
@@ -35,7 +40,7 @@ export const LANE_HINT: Record<Lane, string> = {
   now: `Risk score ${LANE_THRESHOLDS.fixNow} or more`,
   next: `Risk score ${LANE_THRESHOLDS.next} to ${LANE_THRESHOLDS.fixNow - 1}`,
   later: `Risk score below ${LANE_THRESHOLDS.next}, or no score`,
-  done: "Resolved by a rescan",
+  done: "Resolved by a rescan or a newer import",
 };
 
 export const LANE_EMPTY: Record<Lane, string> = {
@@ -90,9 +95,23 @@ export function byScoreDescending(a: FindingOut, b: FindingOut): number {
   return b.risk_score - a.risk_score || a.rule_id.localeCompare(b.rule_id);
 }
 
-export function highestRiskOpen(findings: FindingOut[]): FindingOut | null {
-  const open = findings.filter((f) => isActive(f) && f.risk_score !== null);
-  return [...open].sort(byScoreDescending)[0] ?? null;
+// What the Overview says to start with: the highest score among findings that are open, not
+// dismissed, not merged and not suggested as not applicable. Lanes follow the score, so this is
+// in Fix now when anything is there, and falls back to Next (then Later) when it is not. On a tie
+// CloudShield's own finding goes before an imported one. A merged imported finding is never
+// picked: the CloudShield finding it was merged into stands for it.
+export function startWith(findings: FindingOut[]): FindingOut | null {
+  const candidates = findings.filter(
+    (f) => isActive(f) && f.risk_score !== null && !f.suggested_not_applicable,
+  );
+  const importedLast = (f: FindingOut) => (f.source === "prowler" ? 1 : 0);
+  const sorted = [...candidates].sort(
+    (a, b) =>
+      (b.risk_score ?? 0) - (a.risk_score ?? 0) ||
+      importedLast(a) - importedLast(b) ||
+      a.rule_id.localeCompare(b.rule_id),
+  );
+  return sorted[0] ?? null;
 }
 
 // "arn:aws:iam::123456789012:policy/name" is shown as "...:policy/name".

@@ -8,12 +8,13 @@ from cloudshield.db.models import (
     ResourceRow,
     ScanRow,
 )
-from cloudshield.imports.mapping import NEEDS, SAME_CHECK, SOURCE, rule_id_of
+from cloudshield.imports.mapping import SAME_CHECK, SOURCE, Pair, rule_id_of
 from cloudshield.imports.recheck import SERVICE_OF
 
 PASSED_REASON = "passed in a newer import"
 ALSO_REPORTED = "Also reported by an imported scan"
 NOT_COMPARED = "CloudShield could not read this setting, so the two results are not compared."
+RATES_PREFIX = "The imported scan rates this "
 
 
 def latest_completed_scan(session: Session, account_id: str) -> ScanRow | None:
@@ -26,7 +27,12 @@ def latest_completed_scan(session: Session, account_id: str) -> ScanRow | None:
 
 
 def without_corroboration(evidence: dict) -> dict:
-    items = [i for i in evidence.get("items", []) if i["fact"] not in (ALSO_REPORTED, NOT_COMPARED)]
+    ours = (ALSO_REPORTED, NOT_COMPARED)
+    items = [
+        i
+        for i in evidence.get("items", [])
+        if i["fact"] not in ours and not i["fact"].startswith(RATES_PREFIX)
+    ]
     return {**evidence, "items": items}
 
 
@@ -34,7 +40,7 @@ def with_item(evidence: dict, item: dict) -> dict:
     return {**evidence, "items": [*evidence["items"], item]}
 
 
-def no_data(session: Session, account_id: str, our_rule: str, resource_id: str, scan) -> bool:
+def no_data(session: Session, account_id: str, pair: Pair, resource_id: str, scan) -> bool:
     """True when our side cannot say anything about this rule and resource: the attribute the
     rule needs is missing (unknown), or our latest scan had an error for that service."""
     resource = session.get(ResourceRow, (account_id, resource_id))
@@ -43,7 +49,7 @@ def no_data(session: Session, account_id: str, our_rule: str, resource_id: str, 
     errors = {error["service"] for error in scan.errors} if scan is not None else set()
     if SERVICE_OF.get(resource.resource_type) in errors:
         return True
-    return NEEDS[our_rule] not in resource.attributes
+    return pair.needs not in resource.attributes
 
 
 def current_status(imported: FindingRow | None, passed) -> str | None:
@@ -72,7 +78,7 @@ def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) ->
     for a resource, the two are never compared: nothing is merged or flagged."""
     # The scan being saved right now, or else the latest one that finished.
     scan = scan or latest_completed_scan(session, account_id)
-    for check_id, our_rule in SAME_CHECK.items():
+    for check_id, pair in SAME_CHECK.items():
         imported_rows = session.scalars(
             select(FindingRow).where(
                 FindingRow.account_id == account_id,
@@ -84,7 +90,7 @@ def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) ->
             select(FindingRow).where(
                 FindingRow.account_id == account_id,
                 FindingRow.source == "cloudshield",
-                FindingRow.rule_id == our_rule,
+                FindingRow.rule_id == pair.rule,
             )
         ).all()
         for row in imported_rows:
@@ -113,7 +119,7 @@ def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) ->
             ours_open = ours is not None and ours.status == "OPEN"
             if theirs is None:
                 continue
-            if no_data(session, account_id, our_rule, resource_id, scan):
+            if no_data(session, account_id, pair, resource_id, scan):
                 not_compared = {
                     "fact": NOT_COMPARED,
                     "value": None,
@@ -145,6 +151,18 @@ def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) ->
                         },
                     ],
                 }
+                if ours.severity == "INFO" and imported.severity != "INFO":
+                    # Only the rating differs, and the reader should know why.
+                    ours.evidence = with_item(
+                        ours.evidence,
+                        {
+                            "fact": f"{RATES_PREFIX}{imported.severity}; CloudShield rates it "
+                            "informational because S3 encrypts every bucket by default.",
+                            "value": {"check_id": check_id},
+                            "source": SOURCE,
+                            "certainty": "reported",
+                        },
+                    )
             elif theirs == "PASS" and ours_open:
                 ours.tools_disagree = True
                 ours.corroborated_by = [*ours.corroborated_by, entry]

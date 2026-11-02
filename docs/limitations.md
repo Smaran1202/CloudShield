@@ -51,6 +51,12 @@
   state, and `last_seen_scan_id` shows when it was last seen.
 - Only one scan can run at a time. This is enforced inside one server process, so run a single
   API process. A scan left unfinished by a crash is marked failed when the server starts again.
+- A scan and an import never run together. One lock covers "a scan or an import is in progress":
+  starting a scan while an upload runs, and uploading while a scan runs, both get 409 ("An import
+  is running." or "A scan is running."). A scan holds the lock until it has finished, including
+  its extended checks and their import. The lock lives in the server process only, so the
+  command-line import (`python -m cloudshield.imports`) is not covered: do not run it while a
+  scan is running. SQLite waits up to 5 seconds for another writer before it fails.
 - There are no accounts or logins yet; every row has `account_id` "local".
 
 ## Risk scores
@@ -129,12 +135,20 @@
   check's title when there is none. The check's own title describes the passing state, so it is
   kept only in the details. All evidence from an import has the certainty "reported" and the
   source "imported scan output".
-- Only two checks are treated as the same as one of our rules (see `imports/mapping.py`):
-  `s3_bucket_level_public_access_block` with CIS-S3-001 and `s3_bucket_object_versioning` with
-  CIS-S3-003. When both fail on the same resource, our finding stays and the imported one is
+- Only three checks are treated as the same as one of our rules (see `imports/mapping.py`):
+  `s3_bucket_level_public_access_block` with CIS-S3-001, `s3_bucket_object_versioning` with
+  CIS-S3-003 and `s3_bucket_kms_encryption` with CIS-S3-002. Each pair names, in the same entry,
+  the attribute it needs from our own scan (`public_access_block`, `versioning`, `encryption`).
+  The KMS pair is different in one way: CIS-S3-002 is informational, so when both fail the
+  merged finding stays informational and gets one more evidence item, "The imported scan rates
+  this {severity}; CloudShield rates it informational because S3 encrypts every bucket by default."
+  It has the certainty "reported". The KMS check id was found in a real results file on
+  2026-10-27; the header of `imports/mapping.py` lists what is confirmed. When both fail on the same resource, our finding stays and the imported one is
   merged into it: it is left out of every list, count and score, and ours shows "corroborated by"
   and an extra "also reported by an imported scan" evidence item. When the two disagree, both
-  stay visible and are flagged `tools_disagree`. Our scan counts as "passing" when it stored the
+  stay visible and are flagged `tools_disagree`. A disagreement on a bucket may be legitimate:
+  the imported check may also count an account-level public access block, which CloudShield's own
+  rule does not read (unverified). Our scan counts as "passing" when it stored the
   resource and has no open finding for the rule. When our side has no data, the two results are
   never compared: that is when the resource lacks the attribute the rule needs (the call that
   reads it failed), or when our latest completed scan reported an error for that service. Then
@@ -147,6 +161,15 @@
   the lanes, the headline counts and the risk summary, and stays in the list with its reason. An
   expired disposition makes the finding open again. The environment score stored on a scan is
   fixed when the scan finishes, so a later dismissal changes it only in the live risk summary.
+- The Overview headline says "{N} fixed." and "{F} to fix now.", or "Nothing to fix now." when F
+  is 0. F is the size of the Fix now lane: open, not dismissed, not merged, not informational and
+  scored 80 or more, from any source. The lane counts, tiles, "See all" links, the Findings lane
+  filter and F all come from one function in `web/src/lanes.ts`. "Start with" and the Fix next card
+  use the highest score among open findings that are not dismissed and not suggested as not
+  applicable; on a tie CloudShield's own finding comes before an imported one. Because lanes follow
+  the score, it is in Fix now when anything is there and otherwise in Next, then Later. The Later
+  lane shows "{n} findings across {c} checks" instead of a bare count, with c the number of
+  distinct check ids.
 - CloudShield only suggests "not applicable" (AWS-managed policies, service-linked roles, and
   names in `CLOUDSHIELD_OWN_IDENTITIES`). It never dismisses anything by itself.
 - `score_basis` says whether a score used our own context ("context adjusted") or the severity
@@ -166,6 +189,7 @@
 - Only one extended run can happen at a time. A run is stopped with everything it started after
   `PROWLER_TIMEOUT_SECONDS`. The raw output is deleted after the import unless
   `KEEP_RAW_OUTPUT` is true.
+- If a Prowler install hangs, the status check can take up to 60 seconds.
 - The whole environment is never handed to Prowler, only the variables it needs to find your
   AWS profile and run. Keys that are not in that list, such as the Gemini key, are not passed.
 - Prowler's flags were checked against its documentation and source (`-f`, `--services`, `-M`,

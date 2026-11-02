@@ -94,6 +94,11 @@ the last scan, and the Run scan button. The dashboard has an Overview (a board o
 next and later), Findings (with a detail page for each), Resources and Scans. It only reads from the
 API and starts scans. It never changes anything in AWS.
 
+The Overview headline reads "{N} fixed." and "{F} to fix now.". F counts the findings in the Fix
+now lane (risk score 80 or more) that are open, not dismissed, not merged and not informational,
+from CloudShield and from imported scans alike. Below it, the Next, Later, informational and
+dismissed counts each open the matching Findings list.
+
 The web app loads three fonts (Bricolage Grotesque, Public Sans and IBM Plex Mono) from Google Fonts,
 so your browser contacts Google Fonts when the page opens. If that is blocked, the page falls back to
 system fonts and works the same.
@@ -114,8 +119,10 @@ python -m alembic upgrade head
 python -m cloudshield.imports prowler path\to\prowler-output.ocsf.json
 ```
 
-Imported findings are marked with their source, and their evidence is labelled "reported". See
-`docs/limitations.md` and `docs/third-party.md`.
+Imported findings are marked with their source, and their evidence is labelled "reported". Three
+imported checks (public access block, object versioning and KMS encryption of S3 buckets) test the
+same thing as one of CloudShield's own rules, so when both fail on a bucket they are shown once.
+See `docs/limitations.md` and `docs/third-party.md`.
 
 To run the extended checks from the dashboard ("Run full scan"), install Prowler yourself and
 check that CloudShield can start it:

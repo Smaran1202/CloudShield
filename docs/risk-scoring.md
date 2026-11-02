@@ -30,6 +30,12 @@ is the base plus the adjustments, capped at 100. Each factor is
 When the condition is false the factor is still listed with `adjustment` 0 and a reason, for example
 "Not attached to any running EC2 instance in this scan."
 
+## Lanes
+
+The dashboard places each open finding in a lane by its score: Fix now is 80 or more, Next is 60
+to 79, Later is under 60. A finding with no score is in no lane. A resolved finding is Done. The
+cut-offs are written once, in `web/src/lanes.ts`.
+
 ## Certainty
 
 - `verified`: the fact was read from AWS in this scan (for example the four public access block

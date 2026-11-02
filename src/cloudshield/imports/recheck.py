@@ -7,6 +7,7 @@ from cloudshield.db.models import FindingRow, ImportRow, ResourceRow, ScanRow
 
 # The scanner service that has to have run without errors before we can say a resource is gone.
 # IAM roles are left out: roles are only found through instances, so a missing role is not proof.
+# db/store.py keeps its own tables for resolving our own findings; they are not shared on purpose.
 SERVICE_OF = {"S3": "s3", "Security Group": "ec2", "EC2": "ec2", "IAM Policy": "iam"}
 REGIONAL_TYPES = ("Security Group", "EC2")
 GONE_REASON = "resource no longer exists"

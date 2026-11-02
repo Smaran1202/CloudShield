@@ -19,9 +19,9 @@ import { formatDate, formatRelative, plural, ruleLabel, scanDuration } from "../
 import {
   byScoreDescending,
   countLanes,
-  highestRiskOpen,
   inLane as membersOf,
   isActive,
+  isDismissed,
   LANE_BACKGROUND,
   LANE_EMPTY,
   LANE_HINT,
@@ -29,6 +29,7 @@ import {
   LANE_THRESHOLDS,
   laneOf,
   shortResource,
+  startWith,
   type Lane,
 } from "../lanes";
 import { useRefreshWhenScanEnds, useScans } from "../ScanContext";
@@ -121,10 +122,9 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
   const informational = active.filter((r) => r.severity === "INFO");
   const foundHere = toGo.filter((r) => r.source === "cloudshield").length;
   const imported = toGo.filter((r) => r.source === "prowler").length;
-  const dismissed = rows.filter(
-    (r) => r.status === "OPEN" && r.dismissed && !r.merged_into,
-  ).length;
-  const top = highestRiskOpen(rows);
+  const dismissed = rows.filter(isDismissed).length;
+  const anyImported = rows.some((r) => r.source === "prowler");
+  const top = startWith(rows);
   const inLane = (lane: Lane) => membersOf(rows, lane).sort(byScoreDescending);
   const more = (lane: Lane) => inLane(lane).length > TILES_PER_LANE;
   const noScore = active.filter((r) => r.risk_score === null);
@@ -143,7 +143,9 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
         <div>
           <h1 className={HEADLINE}>
             <MaskLine delay={0}>{`${resolved.length} fixed.`}</MaskLine>
-            <MaskLine delay={130}>{`${toGo.length} to go.`}</MaskLine>
+            <MaskLine delay={130}>
+              {counts.now === 0 ? "Nothing to fix now." : `${counts.now} to fix now.`}
+            </MaskLine>
           </h1>
           <p className="rise mt-6 text-h3" style={{ animationDelay: "400ms" }}>
             {top ? (
@@ -161,18 +163,30 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
               fallback
             )}
           </p>
-          <SourceCounts
+          <CountLine
+            testId="lane-counts"
+            delay={450}
             parts={[
-              [
-                foundHere,
-                "found by CloudShield",
-                "/findings?source=cloudshield&info=hide",
-              ],
-              [imported, "imported", "/findings?source=prowler&info=hide"],
+              [counts.next, "next", "/findings?lane=next"],
+              [counts.later, "later", "/findings?lane=later"],
               [informational.length, "informational", "/findings?info=only"],
               [dismissed, "dismissed", "/findings?lane=dismissed"],
             ]}
           />
+          {anyImported && (
+            <CountLine
+              testId="source-counts"
+              delay={500}
+              parts={[
+                [
+                  foundHere,
+                  "found by CloudShield",
+                  "/findings?source=cloudshield&info=hide",
+                ],
+                [imported, "imported", "/findings?source=prowler&info=hide"],
+              ]}
+            />
+          )}
           <p
             className="rise mt-3 max-w-3xl text-secondary text-dim"
             style={{ animationDelay: "500ms" }}
@@ -225,7 +239,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
           extra={
             more("later") || noScore.length > 0 ? (
               <>
-                <SeeAll lane="later" total={inLane("later").length} />
+                {more("later") && <LaterSummary rows={inLane("later")} />}
                 {noScore.length > 0 && (
                   <li className="rounded-chip border-2 border-dashed border-dash p-4 text-secondary">
                     {noScore.length === 1
@@ -260,23 +274,47 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
 
 const TILES_PER_LANE = 5;
 
-// "5 found by CloudShield, 2 imported, ...": each part opens the matching Findings filter.
-function SourceCounts({ parts }: { parts: [number, string, string][] }) {
+// "3 next, 5 later, ...": each part opens the matching Findings filter.
+function CountLine({
+  parts,
+  testId,
+  delay,
+}: {
+  parts: [number, string, string][];
+  testId: string;
+  delay: number;
+}) {
   return (
     <p
-      data-testid="source-counts"
+      data-testid={testId}
       className="rise mt-3 text-secondary font-semibold"
-      style={{ animationDelay: "450ms" }}
+      style={{ animationDelay: `${delay}ms` }}
     >
       {parts.map(([count, label, to], index) => (
         <span key={label}>
           <Link to={to} className="underline underline-offset-4">
             {count} {label}
           </Link>
-          {index < parts.length - 1 && ", "}
+          {index < parts.length - 1 ? ", " : "."}
         </span>
       ))}
     </p>
+  );
+}
+
+// Later holds the low scores, so it says how many findings and how many checks, not a bare count.
+function LaterSummary({ rows }: { rows: FindingOut[] }) {
+  const checks = new Set(rows.map((r) => r.rule_id)).size;
+  return (
+    <li>
+      <Link
+        to="/findings?lane=later"
+        className="inline-flex min-h-11 items-center gap-2 font-semibold underline"
+      >
+        {rows.length} findings across {plural(checks, "check", "checks")}{" "}
+        <Icon name="arrow" size={18} />
+      </Link>
+    </li>
   );
 }
 
@@ -552,7 +590,7 @@ function LastScanFacts({
   scan: ScanOut;
   findings: ReturnType<typeof useAsync<FindingOut[]>>[0];
 }) {
-  const highest = findings.status === "success" ? highestRiskOpen(findings.data) : null;
+  const highest = findings.status === "success" ? startWith(findings.data) : null;
   const facts: [string, string][] = [
     ["Last scan", `Scan ${scan.id}`],
     ["Finished", formatRelative(scan.finished_at)],
