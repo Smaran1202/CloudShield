@@ -18,7 +18,6 @@ from cloudshield.db.session import make_engine, make_session_factory
 from cloudshield.fixes.explain import HourlyLimit
 from cloudshield.imports.runner import RunOutput, StatusCache, check_runner, run_prowler
 
-
 DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
