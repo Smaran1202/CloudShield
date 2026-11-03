@@ -1,10 +1,14 @@
 from pathlib import Path
+from typing import Literal
 
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # A blank line such as PROWLER_TIMEOUT_SECONDS= (as in .env.example) means "use the default".
+    model_config = SettingsConfigDict(env_ignore_empty=True)
+
     database_url: str = "sqlite:///cloudshield.db"
     aws_region: str | None = None
     gemini_api_key: str | None = None
@@ -23,6 +27,12 @@ class Settings(BaseSettings):
     prowler_command: str = '["prowler"]'
     prowler_services: str = "s3 ec2 iam"
     prowler_timeout_seconds: int = 1800
+    # local runs the Prowler above. docker runs the Prowler container instead.
+    prowler_mode: Literal["local", "docker"] = "local"
+    # A pinned version tag (for example toniblyx/prowler:5.44.0) is more reproducible than latest.
+    prowler_docker_image: str = "toniblyx/prowler:latest"
+    # The docker program, or its full path when it is not on the PATH of the server.
+    docker_command: str = "docker"
     cloudshield_data_dir: str = "./data"
     keep_raw_output: bool = False
 

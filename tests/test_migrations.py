@@ -32,7 +32,7 @@ def test_alembic_upgrade_head_creates_the_tables_on_a_fresh_database(tmp_path, m
     with engine.connect() as connection:
         version = connection.execute(text("select version_num from alembic_version")).scalar()
     assert {"scans", "resources", "findings", "fixes"} <= tables
-    assert version == "0007"
+    assert version == "0008"
 
 
 def test_migrated_schema_matches_the_models(tmp_path, monkeypatch):
@@ -89,16 +89,12 @@ def test_phase_3_data_survives_the_risk_migration_and_still_works(tmp_path, monk
     client = TestClient(create_app(database_url=url, load_env=False))
     finding = client.get("/api/findings").json()[0]
     scan = client.get("/api/scans/1").json()
-    summary = client.get("/api/risk/summary").json()
     assert finding["finding_id"] == "F-CIS-S3-003-aaaaaaaa"
     assert finding["risk_score"] is None
     assert finding["risk_factors"] == []
     assert finding["evidence"] == {"items": []}
     assert scan["environment_score"] is None
     assert scan["severity_counts"] == {}
-    assert client.get("/api/risk/trend").json() == []
-    assert summary["counts_by_severity"]["MEDIUM"] == 1
-    assert summary["top_findings"] == []
 
 
 def test_phase_4_data_survives_the_fixes_migration_and_a_fix_can_be_made(tmp_path, monkeypatch):

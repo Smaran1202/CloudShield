@@ -217,3 +217,10 @@ def test_keeps_an_unknown_arn_and_the_type_prowler_gave():
     uid = f"arn:aws:lambda:ap-southeast-2:{ACCOUNT}:function:f"
 
     assert map_resource(uid, ACCOUNT, "AwsLambdaFunction") == (uid, "AwsLambdaFunction")
+
+
+def test_a_file_nested_too_deeply_is_rejected_in_plain_words():
+    deep = b"[" * 200_000 + b"]" * 200_000
+
+    with pytest.raises(ImportRejected, match="nested too deeply"):
+        parse_bytes(deep)

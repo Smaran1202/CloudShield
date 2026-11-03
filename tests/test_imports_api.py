@@ -140,15 +140,15 @@ def test_the_fix_of_an_imported_finding_is_guidance_with_no_ai_text(tmp_path, mo
     assert client.post(f"/api/findings/{imported(client)['finding_id']}/fix").json() == fix
 
 
-def test_the_environment_score_and_summary_count_open_imported_findings(tmp_path):
+def test_open_imported_findings_are_listed_with_their_severity_and_score(tmp_path):
     client = make_client(tmp_path)
     load(client, [entry(severity="Critical"), entry(check="c2", severity="Low")])
 
-    summary = client.get("/api/risk/summary").json()
+    listed = client.get("/api/findings").json()
 
-    assert summary["counts_by_severity"]["CRITICAL"] == 1
-    assert summary["top_findings"][0]["source"] == "prowler"
-    assert summary["top_findings"][0]["risk_score"] == 90
+    assert [f["severity"] for f in listed] == ["CRITICAL", "LOW"]
+    assert listed[0]["source"] == "prowler"
+    assert listed[0]["risk_score"] == 90
 
 
 def test_the_import_command_prints_counts_and_masks_the_account(tmp_path, monkeypatch, capsys):

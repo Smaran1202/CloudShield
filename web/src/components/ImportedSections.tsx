@@ -159,7 +159,10 @@ export function ImportHistory() {
                   >
                     {item.file_name ?? "-"}
                   </span>
-                  <span role="cell">{ORIGIN_LABEL[item.origin]}</span>
+                  <span role="cell" title={item.run_image ?? undefined}>
+                    {ORIGIN_LABEL[item.origin]}
+                    {item.run_mode === "docker" && " (Docker)"}
+                  </span>
                   <span role="cell">{item.tool_version ?? "-"}</span>
                   <span role="cell" title={formatDate(item.imported_at)}>
                     <span className="block font-semibold">

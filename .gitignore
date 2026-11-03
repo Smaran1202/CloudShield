@@ -17,3 +17,5 @@ prowler-output*.json
 samples
 data/
 c.md
+test-results/
+playwright-report/

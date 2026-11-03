@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { formatDate } from "../format";
 import { certaintySummary } from "./Overview";
 import { callsTo, fail } from "../test/mockApi";
-import { finding, scan, summary } from "../test/factories";
+import { finding, scan } from "../test/factories";
 import { never, renderApp } from "../test/render";
 
 const ARN = "arn:aws:iam::123456789012:policy/deploy";
@@ -40,7 +40,6 @@ const rows = [
 const results = {
   "GET /api/scans": [scan()],
   "GET /api/findings": rows,
-  "GET /api/risk/summary": summary({ environment_score: 99.8 }),
 };
 
 function lane(name: string): HTMLElement {
@@ -80,7 +79,6 @@ describe("Overview: before a scan", () => {
     expect(screen.queryByText(/fixed\./)).not.toBeInTheDocument();
     expect(screen.queryByText(/to fix now\./)).not.toBeInTheDocument();
     expect(callsTo("GET", "/api/findings")).toHaveLength(0);
-    expect(callsTo("GET", "/api/risk/summary")).toHaveLength(0);
   });
 
   it("still says no scan yet when the only scan failed, and shows why", async () => {
@@ -465,7 +463,6 @@ describe("Overview: below the lanes", () => {
     expect(label.closest("div")).toHaveTextContent("95");
     expect(screen.queryByText(/Combined environment score/)).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-    expect(callsTo("GET", "/api/risk/summary")).toHaveLength(0);
   });
 
   it("shows the same score in the footer as on the Fix next card, even when the top finding is suggested as not applicable", async () => {
@@ -488,7 +485,7 @@ describe("Overview: below the lanes", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("findings exploded");
   });
 
-  it("has no unlabelled trend line, and does not ask for the trend", async () => {
+  it("has no unlabelled trend line", async () => {
     renderApp("/", results);
 
     await screen.findByRole("region", { name: "Fix now" });
@@ -496,7 +493,6 @@ describe("Overview: below the lanes", () => {
     expect(
       screen.queryByRole("img", { name: /Combined environment score by scan/ }),
     ).toBeNull();
-    expect(callsTo("GET", "/api/risk/trend")).toHaveLength(0);
   });
 
   it("shows the facts of the last scan: id, when it finished, how long, resources, errors", async () => {
@@ -604,7 +600,6 @@ describe("Overview: running a scan", () => {
           ? scan({ id: 5, status: "running", progress: "Scanning AWS" })
           : scan({ id: 5 }),
       "GET /api/findings": rows,
-      "GET /api/risk/summary": summary(),
     });
 
     await user.click(await screen.findByRole("button", { name: "Run scan" }));
@@ -697,7 +692,6 @@ describe("Overview: running a scan", () => {
       "POST /api/scans": scan({ id: 4, status: "queued" }),
       "GET /api/scans/4": scan({ id: 4 }),
       "GET /api/findings": rows,
-      "GET /api/risk/summary": summary(),
     });
 
     await user.click(await screen.findByRole("button", { name: "Run scan" }));

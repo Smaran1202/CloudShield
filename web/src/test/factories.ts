@@ -4,9 +4,7 @@ import type {
   FixOut,
   GuardrailOut,
   ResourceOut,
-  RiskSummaryOut,
   ScanOut,
-  TrendPoint,
 } from "../api";
 
 // Test data only. It is never shown outside the tests.
@@ -138,42 +136,6 @@ export function resource(overrides: Partial<ResourceOut> = {}): ResourceOut {
     last_seen_scan_id: 1,
     ...overrides,
   };
-}
-
-export function summary(overrides: Partial<RiskSummaryOut> = {}): RiskSummaryOut {
-  return {
-    environment_score: 99.8,
-    counts_by_severity: { CRITICAL: 0, HIGH: 2, MEDIUM: 1, LOW: 0, INFO: 4 },
-    top_findings: [
-      finding(),
-      finding({
-        finding_id: "F-CIS-S3-001-bbbbbbbb",
-        rule_id: "CIS-S3-001",
-        resource_id: "my-bucket",
-        resource_type: "S3",
-        title: "S3 bucket does not block all public access",
-        risk_score: 85,
-      }),
-    ],
-    ...overrides,
-  };
-}
-
-export function trend(): TrendPoint[] {
-  return [
-    {
-      scan_id: 1,
-      finished_at: "2026-10-01T10:00:42Z",
-      environment_score: 60,
-      severity_counts: { HIGH: 1 },
-    },
-    {
-      scan_id: 2,
-      finished_at: "2026-10-02T10:00:42Z",
-      environment_score: 99.8,
-      severity_counts: { HIGH: 2 },
-    },
-  ];
 }
 
 export function guardrail(overrides: Partial<GuardrailOut> = {}): GuardrailOut {

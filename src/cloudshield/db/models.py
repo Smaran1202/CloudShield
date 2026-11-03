@@ -136,6 +136,8 @@ class ImportRow(Base):
     services_used: Mapped[list | None] = mapped_column(JSON)
     regions_used: Mapped[list | None] = mapped_column(JSON)
     scan_id: Mapped[int | None]  # the scan that started a dashboard run
+    run_mode: Mapped[str | None]  # local or docker, for a dashboard run
+    run_image: Mapped[str | None]  # the docker image, for a docker run
 
 
 class PassedCheckRow(Base):

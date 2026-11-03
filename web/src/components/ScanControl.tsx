@@ -104,23 +104,27 @@ function FullScanItem({
           Could not check: {status.message}
         </p>
       )}
-      {status.status === "success" && !status.data.available && (
-        <div role="note" className="px-3 pb-2 text-secondary">
-          <p>
-            <span className="font-semibold">{status.data.reason}</span>{" "}
-            <span className="text-dim">{status.data.hint}</span>
-          </p>
-          {status.data.blocked && (
-            <button
-              type="button"
-              onClick={onImport}
-              className={`${SECONDARY_BUTTON} mt-2`}
-            >
-              Import a results file
-            </button>
-          )}
-        </div>
-      )}
+      {status.status === "success" &&
+        (!status.data.available || status.data.reason || status.data.warning) && (
+          <div role="note" className="px-3 pb-2 text-secondary">
+            <p>
+              <span className="font-semibold">{status.data.reason}</span>{" "}
+              <span className="text-dim">{status.data.hint}</span>
+            </p>
+            {status.data.warning && (
+              <p className="mt-1 text-dim">{status.data.warning}</p>
+            )}
+            {!status.data.available && status.data.blocked && (
+              <button
+                type="button"
+                onClick={onImport}
+                className={`${SECONDARY_BUTTON} mt-2`}
+              >
+                Import a results file
+              </button>
+            )}
+          </div>
+        )}
     </div>
   );
 }

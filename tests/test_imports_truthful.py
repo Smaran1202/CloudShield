@@ -349,14 +349,15 @@ def test_when_both_report_the_same_thing_ours_stays_and_the_imported_one_is_merg
 def test_a_merged_finding_is_left_out_of_counts_scores_and_lists(tmp_path):
     client = make_client(tmp_path)
     scan(client, [bucket()])
-    before = client.get("/api/risk/summary").json()
+    before = client.get("/api/scans").json()[0]
 
     load(client, [entry(check=BLOCK_CHECK, severity="Critical")])
+    scan(client, [bucket()])
 
-    after = client.get("/api/risk/summary").json()
+    after = client.get("/api/scans").json()[0]
+    assert after["id"] != before["id"]
     assert after["environment_score"] == before["environment_score"]
-    assert after["counts_by_severity"] == before["counts_by_severity"]
-    assert len(after["top_findings"]) == 1
+    assert after["severity_counts"] == before["severity_counts"]
     assert len(client.get("/api/findings", params={"source": "prowler"}).json()) == 0
     assert len(client.get("/api/findings", params={"status": "OPEN"}).json()) == 1
 

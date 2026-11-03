@@ -17,6 +17,7 @@ export const BASE = {
     reason: null,
     hint: null,
     blocked: false,
+    warning: null,
     install_command: "pip install prowler",
     run_command: null,
   },

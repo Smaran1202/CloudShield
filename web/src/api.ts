@@ -126,19 +126,6 @@ export interface FindingDetailOut extends FindingOut {
   resource: ResourceOut | null;
 }
 
-export interface RiskSummaryOut {
-  environment_score: number;
-  counts_by_severity: Record<string, number>;
-  top_findings: FindingOut[];
-}
-
-export interface TrendPoint {
-  scan_id: number;
-  finished_at: string;
-  environment_score: number;
-  severity_counts: Record<string, number>;
-}
-
 export interface PatchFile {
   name: string;
   content: string;
@@ -237,6 +224,9 @@ export interface ImportOut {
   services_used: string[] | null;
   regions_used: string[] | null;
   scan_id: number | null;
+  // How a dashboard run was made, and the docker image. Null for a file.
+  run_mode: "local" | "docker" | null;
+  run_image: string | null;
 }
 
 export interface ExtendedStatusOut {
@@ -246,6 +236,8 @@ export interface ExtendedStatusOut {
   hint: string | null;
   // True when an operating-system policy stops the second scanner from running here.
   blocked: boolean;
+  // Something that may stop a run although it looks possible, such as a data folder in OneDrive.
+  warning: string | null;
   // The commands to run it somewhere else. run_command is null when no region is set on the
   // server.
   install_command: string;
@@ -355,8 +347,6 @@ export const api = {
     }),
   finding: (id: string) =>
     request<FindingDetailOut>(`/api/findings/${encodeURIComponent(id)}`),
-  riskSummary: () => request<RiskSummaryOut>("/api/risk/summary"),
-  riskTrend: () => request<TrendPoint[]>("/api/risk/trend"),
   guardrails: () => request<GuardrailOut[]>("/api/guardrails"),
   generateFix: (id: string, refresh = false) =>
     request<FixOut>(`/api/findings/${encodeURIComponent(id)}/fix?refresh=${refresh}`, {

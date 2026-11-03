@@ -107,6 +107,8 @@ def read_array(raw: bytes) -> list:
         raise ImportRejected(
             f"The file is not valid JSON ({exc.msg} at line {exc.lineno})."
         ) from exc
+    except RecursionError as exc:
+        raise ImportRejected("The file is nested too deeply.") from exc
     if not isinstance(data, list):
         raise ImportRejected("Expected a JSON array of OCSF findings.")
     if not data:

@@ -54,8 +54,8 @@ be reached.
 
 `100 x (1 - product of (1 - score / 100))` over all open findings that count toward risk. Each scan
 stores the result as `environment_score`, with `severity_counts` for all open findings (INFO included).
-A resolved finding keeps its last score but is left out. `GET /api/risk/trend` returns one point per
-completed scan.
+A resolved finding keeps its last score but is left out. The scans list (`GET /api/scans`) gives
+the score and the counts of each scan.
 
 ## Evidence
 

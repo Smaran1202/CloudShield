@@ -26,6 +26,8 @@ class RunInfo:
     services: list[str] | None = None
     regions: list[str] | None = None
     scan_id: int | None = None
+    mode: str | None = None
+    image: str | None = None
 
 
 def check_not_imported(session: Session, parsed: ParsedFile, account_id: str) -> None:
@@ -131,6 +133,8 @@ def import_parsed(
         services_used=run.services,
         regions_used=run.regions,
         scan_id=run.scan_id,
+        run_mode=run.mode,
+        run_image=run.image,
     )
     session.add(import_row)
     session.flush()

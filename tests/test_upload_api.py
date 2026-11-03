@@ -253,3 +253,13 @@ def test_the_status_carries_the_blocked_flag_hint_and_the_commands(tmp_path, mon
     assert answer["run_command"] == (
         "prowler aws -f ap-southeast-2 --services s3 ec2 iam -M json-ocsf -o prowler-out -b -z"
     )
+
+
+def test_a_file_nested_too_deeply_is_refused_with_422_and_the_lock_is_released(tmp_path):
+    client = make_client(tmp_path)
+
+    reply = upload(client, b"[" * 200_000 + b"]" * 200_000)
+
+    assert reply.status_code == 422
+    assert reply.json()["detail"] == "The file is nested too deeply."
+    assert upload(client, fixture_file()).status_code == 200

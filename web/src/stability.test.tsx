@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { callsTo, fail } from "./test/mockApi";
-import { finding, resource, scan, summary, trend } from "./test/factories";
+import { finding, resource, scan } from "./test/factories";
 import { renderApp } from "./test/render";
 
 // Animations play when an element first appears. These tests check that a refetch keeps the
@@ -52,8 +52,6 @@ describe("lists keep their elements when data is fetched again", () => {
       "GET /api/scans": scansAfterRun(),
       "GET /api/findings": () =>
         ++listCalls === 1 ? [first, second] : [first, second, third],
-      "GET /api/risk/summary": summary(),
-      "GET /api/risk/trend": trend(),
       "POST /api/scans": scan({ id: 2, status: "queued" }),
       "GET /api/scans/2": scan({ id: 2 }),
     });

@@ -60,17 +60,78 @@ start a scan. Restart the API after changing `.env`.
 - **Not found.** Set `PROWLER_PYTHON` to the full path, as in step 2.
 - **Wrong Python.** The message says that module `prowler` is missing. Install it in that
   Python, or point `PROWLER_PYTHON` at the right one.
-- **Docker.** Set `PROWLER_COMMAND` to a JSON list that starts your Prowler container. CloudShield
-  adds `aws -f ... --services ... -M json-ocsf -o <folder> -b -z` after it, so the container
-  must start Prowler with those arguments and have that folder available. This has not been
-  tried here. If it does not fit, run Prowler yourself and import the file with
-  `python -m cloudshield.imports prowler <file>`.
+- **Docker.** Use Docker mode (next section). If it does not fit, run Prowler yourself and import
+  the file with `python -m cloudshield.imports prowler <file>`.
 - **WSL.** Install Prowler inside WSL. A folder on the Windows side looks different from inside
   WSL, so importing the file you made there is simpler than setting `PROWLER_COMMAND`.
 
+## Docker mode
+
+Instead of installing Prowler, CloudShield can run the Prowler container. You need Docker Desktop
+(or another Docker engine) running. Put this in `.env`:
+
+```
+PROWLER_MODE=docker
+CLOUDSHIELD_DATA_DIR=C:\Users\<name>\cloudshield-data
+```
+
+| Setting | Meaning | Default |
+|---|---|---|
+| `PROWLER_MODE` | `local` or `docker` | `local` |
+| `PROWLER_DOCKER_IMAGE` | the image to run. A pinned version tag, such as `toniblyx/prowler:5.44.0`, gives the same Prowler every time; `latest` changes | `toniblyx/prowler:latest` |
+| `DOCKER_COMMAND` | the docker program, or its full path, such as `C:\Program Files\Docker\Docker\resources\bin\docker.exe` | `docker` |
+
+Local mode is unchanged when `PROWLER_MODE` is not `docker`. Run
+`python -m cloudshield.imports check-runner` to see which of these it reports:
+
+- **Docker was not found.** Set `DOCKER_COMMAND` to the full path, or start the server from a
+  terminal where `docker` works.
+- **Docker is installed but its engine is not running.** Start Docker Desktop and wait until it
+  says the engine is running. The check gives up after 10 seconds, so it cannot hang.
+- **The image is not downloaded yet.** The run can still start: the first run downloads the image
+  and may take several minutes. A status check never downloads anything and never starts a scan.
+- **Ready.**
+
+### The data folder
+
+Docker mounts the run folder (under `CLOUDSHIELD_DATA_DIR`) into the container. A folder inside
+OneDrive may fail to mount, so choose one outside it, such as `C:\Users\<name>\cloudshield-data`.
+The default `./data` is inside OneDrive if the project is. The dashboard and `check-runner` warn
+when the folder path contains OneDrive.
+
+### Credentials
+
+The API process reads the credentials of the profile it uses (the standard AWS chain, for example
+`AWS_PROFILE`) and puts the access key, secret and, only if the profile has one, the session token
+into the environment of the docker client. The command only names them (`-e AWS_ACCESS_KEY_ID`,
+and so on), so no value is on the command line or in the logs. Your `.aws` folder is never
+mounted.
+
+The docker client is started with these variables only, and no others (so never the Gemini key):
+`PATH`, `SYSTEMROOT`, `SYSTEMDRIVE`, `TEMP`, `TMP`, `USERPROFILE`, `HOME`, `APPDATA`,
+`LOCALAPPDATA`, `XDG_RUNTIME_DIR`, and Docker's own `DOCKER_HOST`, `DOCKER_CONTEXT`,
+`DOCKER_CONFIG`, `DOCKER_CERT_PATH`, `DOCKER_TLS` and `DOCKER_TLS_VERIFY`, plus the AWS credentials
+above. On Windows the client needs `PATH`, `SYSTEMROOT` and `USERPROFILE` (to find its
+`.docker` settings); the rest are included so that other setups still work.
+
+### What the container can and cannot see
+
+It can see the run folder, the AWS credentials above and the internet (to reach AWS). It cannot see
+the rest of your files, your `.aws` folder, the CloudShield database or `.env`. It has the same
+read access as the profile. Nothing is changed in the account.
+
+### Stopping
+
+A run that passes `PROWLER_TIMEOUT_SECONDS`, or that is cancelled, stops the docker client and its
+processes, then runs `docker kill` and `docker rm -f` on the container by name
+(`cloudshield-<random>`). `docker rm -f` also runs when every run ends. The run folder is deleted
+unless `KEEP_RAW_OUTPUT` is set. The import records the real Prowler version from the results
+file, the mode and the image.
+
 ## Run it elsewhere and import the file (CloudShell)
 
-This route works when Prowler cannot run on this computer, and it needs nothing installed here.
+This route is the fallback when neither Docker mode nor a local install works on this computer,
+and it needs nothing installed here.
 Choose "Import a results file" in the Run scan menu, or above the Imports table. The window shows
 the two commands with copy buttons.
 

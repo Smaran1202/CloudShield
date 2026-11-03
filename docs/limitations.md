@@ -166,10 +166,11 @@
   again after the next scan that reads the setting. Partial matches, such as the IAM wildcard check, never merge. Every other pair of
   imported and own findings is shown twice, each with its source.
 - A finding can be dismissed as accepted or not applicable, with a reason of at least 10
-  characters and an optional end date (valid through the end of that day, UTC). It then leaves
-  the lanes, the headline counts and the risk summary, and stays in the list with its reason. An
-  expired disposition makes the finding open again. The environment score stored on a scan is
-  fixed when the scan finishes, so a later dismissal changes it only in the live risk summary.
+  characters and an optional end date. A dismissal "until" date ends at the end of that day in
+  UTC, not in your own time zone. The finding then leaves the lanes and the headline counts, and
+  stays in the list with its reason. An expired disposition makes the finding open again. The
+  environment score stored on a scan is fixed when the scan finishes, so a later dismissal does
+  not change it.
 - The Overview headline says "{N} fixed." and "{F} to fix now.", or "Nothing to fix now." when F
   is 0. F is the size of the Fix now lane: open, not dismissed, not merged, not informational and
   scored 80 or more, from any source. The lane counts, tiles, "See all" links, the Findings lane
@@ -201,6 +202,20 @@
 - If a Prowler install hangs, the status check can take up to 60 seconds.
 - The whole environment is never handed to Prowler, only the variables it needs to find your
   AWS profile and run. Keys that are not in that list, such as the Gemini key, are not passed.
+- Docker mode (`PROWLER_MODE=docker`) runs the Prowler container. The tests use a fake docker
+  program, so the container itself was only run by hand by the author, once, on Windows. The
+  container sees the temporary run folder and the AWS credentials of the server's profile
+  (access key, secret and session token, as environment variables of the container), and nothing
+  else of this computer. Those credentials are read by the API process, so the container has the
+  same read access as the profile. The `-o` folder is not passed: the image writes to
+  `/home/prowler/output`, which is the mounted folder (checked in the image's Dockerfile, whose
+  working directory is `/home/prowler`, and by the author's manual run, not in Prowler's
+  documentation). On Linux the container user (UID 1000) may be unable to write to a mounted
+  folder owned by another user; this was not tried. A data folder inside OneDrive may fail to
+  mount, and the dashboard warns about it. The first run downloads the image and may take several
+  minutes (the timeout still applies). A status check never pulls an image. A tag such as
+  `latest` can change under you; pin a version for reproducible results. The Docker client gets
+  only the variables listed in `docs/extended-checks.md`.
 - Prowler's flags were checked against its documentation and source (`-f`, `--services`, `-M`,
   `-o`, `-b`, `-z`, `--version`). A different Prowler version may change them.
 - A results file can be imported from the dashboard (origin "Upload"). The API reads the body in

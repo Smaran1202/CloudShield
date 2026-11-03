@@ -117,6 +117,10 @@ export function ImportDialog({
           Nothing in this file leaves your computer. CloudShield never changes your AWS
           account.
         </p>
+        <p className="mt-2 text-secondary text-dim">
+          Use this when Run full scan cannot work on this computer, because neither Docker
+          nor a local Prowler install is available.
+        </p>
 
         <section aria-labelledby={`${titleId}-1`} className="mt-6">
           <h3 id={`${titleId}-1`} className="text-label font-semibold">

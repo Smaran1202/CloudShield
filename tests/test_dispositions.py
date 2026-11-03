@@ -70,18 +70,12 @@ def test_dismissing_a_finding_records_the_reason_and_the_time(tmp_path):
     assert finding["status"] == "OPEN"
 
 
-def test_a_dismissed_finding_leaves_the_risk_summary_but_stays_listed_with_its_reason(tmp_path):
+def test_a_dismissed_finding_stays_listed_with_its_reason(tmp_path):
     client = make_client(tmp_path)
     finding_id = one(client)
-    before = client.get("/api/risk/summary").json()
-    assert before["counts_by_severity"]["HIGH"] == 1
 
     accept(client, finding_id, disposition="not_applicable")
 
-    summary = client.get("/api/risk/summary").json()
-    assert summary["counts_by_severity"]["HIGH"] == 0
-    assert summary["top_findings"] == []
-    assert summary["environment_score"] == 0
     listed = client.get("/api/findings").json()
     assert [f["finding_id"] for f in listed] == [finding_id]
     assert listed[0]["dismissed"] is True
@@ -101,7 +95,6 @@ def test_clearing_the_disposition_opens_the_finding_again(tmp_path):
     assert finding["disposition"] == "none"
     assert finding["disposition_reason"] is None
     assert finding["dismissed"] is False
-    assert client.get("/api/risk/summary").json()["counts_by_severity"]["HIGH"] == 1
 
 
 @pytest.mark.parametrize(
@@ -193,7 +186,6 @@ def test_an_expired_disposition_returns_the_finding_to_open(tmp_path):
     assert finding["disposition"] == "none"
     assert finding["disposition_reason"] is None
     assert finding["disposition_until"] is None
-    assert client.get("/api/risk/summary").json()["counts_by_severity"]["HIGH"] == 1
     assert client.get(f"/api/findings/{finding_id}").json()["dismissed"] is False
 
 

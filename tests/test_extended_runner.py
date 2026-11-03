@@ -10,6 +10,7 @@ from cloudshield.imports import runner
 from cloudshield.imports.runner import (
     ALLOWED_ENV,
     BLOCKED_HINT,
+    EXPIRED_HINT,
     ExtendedError,
     RunnerStatus,
     StatusCache,
@@ -570,3 +571,57 @@ def test_the_cloudshell_command_uses_the_same_flags_as_a_run(tmp_path):
 def test_the_cloudshell_command_refuses_a_name_that_could_be_an_option(tmp_path):
     with pytest.raises(ExtendedError):
         cloudshell_command(settings_for(tmp_path), ["--evil"])
+
+
+def test_a_results_file_over_the_size_limit_is_refused_before_it_is_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "MAX_BYTES", 10)
+    popen = FakePopen(files={"x.ocsf.json": b"x" * 11})
+    read = []
+    real_read_bytes = Path.read_bytes
+    monkeypatch.setattr(Path, "read_bytes", lambda self: read.append(self) or real_read_bytes(self))
+
+    with pytest.raises(ExtendedError) as caught:
+        run(tmp_path, popen)
+
+    assert caught.value.status == "failed"
+    assert "over 50 MB" in caught.value.message
+    assert "fewer services or regions" in caught.value.hint
+    assert read == []
+    assert run_dirs(tmp_path) == []
+
+
+def test_a_results_file_of_exactly_the_size_limit_is_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "MAX_BYTES", 10)
+
+    output = run(tmp_path, FakePopen(files={"x.ocsf.json": b"x" * 10}))
+
+    assert output.content == b"x" * 10
+
+
+def test_an_expired_token_in_a_failed_run_says_to_sign_in_again(tmp_path):
+    err = b"An error occurred (ExpiredTokenException) when calling the ListBuckets operation"
+
+    with pytest.raises(ExtendedError) as caught:
+        run(tmp_path, FakePopen(FakeProcess(code=1, err=err)))
+
+    assert caught.value.hint == EXPIRED_HINT
+    assert "Sign in to AWS again" in caught.value.hint
+
+
+@pytest.mark.parametrize("word", ["ExpiredToken", "ExpiredTokenException"])
+def test_a_successful_run_that_saw_an_expired_token_says_so(tmp_path, word):
+    popen = FakePopen(FakeProcess(code=3, err=f"error: {word} for ec2".encode()))
+
+    output = run(tmp_path, popen)
+
+    assert output.saw_permission_errors is True
+    assert output.saw_expired_credentials is True
+
+
+def test_access_denied_does_not_say_the_credentials_expired(tmp_path):
+    popen = FakePopen(FakeProcess(code=0, err=b"AccessDenied for ec2"))
+
+    output = run(tmp_path, popen)
+
+    assert output.saw_permission_errors is True
+    assert output.saw_expired_credentials is False

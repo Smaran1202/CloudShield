@@ -55,8 +55,14 @@ def import_prowler(path: str, account_id: str, refresh: bool = False) -> int:
 
 def check_extended_runner() -> int:
     status = check_runner(Settings())
+    if status.warning:
+        print(f"Warning: {status.warning}")
     if status.available:
         print(f"Prowler can run here: {status.version}")
+        if status.reason:
+            print(status.reason)
+        if status.hint:
+            print(status.hint)
         return 0
     print(f"Prowler cannot run here: {status.reason}")
     print(f"What to do: {status.hint}")

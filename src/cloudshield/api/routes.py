@@ -23,12 +23,10 @@ from cloudshield.api.schemas import (
     ImportOut,
     ImportResultOut,
     ResourceOut,
-    RiskSummaryOut,
     ScanOut,
     ScanRequest,
     ScoreBreakdown,
     SuggestedNotApplicable,
-    TrendPoint,
 )
 from cloudshield.db import store
 from cloudshield.db.models import (
@@ -57,7 +55,6 @@ from cloudshield.imports.parser import MAX_BYTES, AlreadyImported, ImportRejecte
 from cloudshield.imports.recheck import latest_import_id
 from cloudshield.imports.runner import INSTALL_COMMAND, ExtendedError, cloudshell_command
 from cloudshield.imports.upload import ImportBusy, import_upload
-from cloudshield.risk.environment import environment_score, severity_counts
 from cloudshield.risk.scoring import score_breakdown
 
 logger = logging.getLogger(__name__)
@@ -160,6 +157,7 @@ def extended_status(request: Request) -> ExtendedStatusOut:
         reason=answer.reason,
         hint=answer.hint,
         blocked=answer.blocked,
+        warning=answer.warning,
         install_command=INSTALL_COMMAND,
         run_command=run_command,
     )
@@ -217,47 +215,6 @@ def list_findings(
     rows = sorted(rows, key=lambda r: (SEVERITIES.index(r.severity), r.rule_id, r.resource_id))
     view = make_view(request, session)
     return [finding_out(row, view) for row in rows]
-
-
-@router.get("/risk/summary", response_model=RiskSummaryOut)
-def risk_summary(
-    request: Request, session: Annotated[Session, Depends(get_session)]
-) -> RiskSummaryOut:
-    query = select(FindingRow).where(
-        FindingRow.account_id == ACCOUNT_ID, FindingRow.status == "OPEN"
-    )
-    view = make_view(request, session)
-    # Merged and dismissed findings are left out of the counts and the scores.
-    open_rows = [r for r in session.scalars(query).all() if counts_toward_open(r, view.now)]
-    scored = [row for row in open_rows if row.risk_score is not None]
-    top = sorted(scored, key=lambda r: (-r.risk_score, SEVERITIES.index(r.severity), r.resource_id))
-    return RiskSummaryOut(
-        environment_score=environment_score([row.risk_score for row in scored]),
-        counts_by_severity=severity_counts([row.severity for row in open_rows]),
-        top_findings=[finding_out(row, view) for row in top[:5]],
-    )
-
-
-@router.get("/risk/trend", response_model=list[TrendPoint])
-def risk_trend(session: Annotated[Session, Depends(get_session)]) -> list[TrendPoint]:
-    query = (
-        select(ScanRow)
-        .where(
-            ScanRow.account_id == ACCOUNT_ID,
-            ScanRow.status == "completed",
-            ScanRow.environment_score.is_not(None),
-        )
-        .order_by(ScanRow.id)
-    )
-    return [
-        TrendPoint(
-            scan_id=scan.id,
-            finished_at=scan.finished_at,
-            environment_score=scan.environment_score,
-            severity_counts=scan.severity_counts,
-        )
-        for scan in session.scalars(query)
-    ]
 
 
 @router.get("/findings/{finding_id}", response_model=FindingDetailOut)
@@ -393,6 +350,8 @@ def list_imports(session: Annotated[Session, Depends(get_session)]) -> list[Impo
             services_used=row.services_used,
             regions_used=row.regions_used,
             scan_id=row.scan_id,
+            run_mode=row.run_mode,
+            run_image=row.run_image,
         )
         for row in session.scalars(query.order_by(ImportRow.id.desc()))
     ]

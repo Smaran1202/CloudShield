@@ -7,7 +7,7 @@ from cloudshield.db import store
 from cloudshield.db.models import ACCOUNT_ID, ScanRow
 from cloudshield.imports.importer import RunInfo, import_parsed
 from cloudshield.imports.parser import AlreadyImported, ImportRejected, parse_bytes
-from cloudshield.imports.runner import PERMISSION_HINT, ExtendedError, RunOutput
+from cloudshield.imports.runner import EXPIRED_HINT, PERMISSION_HINT, ExtendedError, RunOutput
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,15 @@ def run_extended_stage(
         return outcome("failed", message, "See the log of the API server.")
 
     store.set_progress(session, scan.id, IMPORTING)
-    run = RunInfo("dashboard", output.duration_seconds, output.services, output.regions, scan.id)
+    run = RunInfo(
+        "dashboard",
+        output.duration_seconds,
+        output.services,
+        output.regions,
+        scan.id,
+        output.mode,
+        output.image,
+    )
     try:
         parsed = parse_bytes(output.content)
         result = import_parsed(session, parsed, ACCOUNT_ID, output.file_name, run, scan)
@@ -65,5 +73,6 @@ def run_extended_stage(
         f"{counts['passed']} passed"
     )
     if output.saw_permission_errors:
-        return outcome("ok", message + ". Prowler reported errors.", PERMISSION_HINT)
+        hint = EXPIRED_HINT if output.saw_expired_credentials else PERMISSION_HINT
+        return outcome("ok", message + ". Prowler reported errors.", hint)
     return outcome("ok", message)

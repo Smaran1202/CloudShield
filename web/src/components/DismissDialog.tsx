@@ -117,7 +117,8 @@ export function DismissDialog({
           />
         </label>
         <p className="mt-1 text-secondary text-dim">
-          After this day the finding comes back as open.
+          After this day the finding comes back as open. The day ends at the end of that
+          date in UTC.
         </p>
 
         {error && (

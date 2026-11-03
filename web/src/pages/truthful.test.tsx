@@ -399,6 +399,16 @@ describe("Finding page: dismissing", () => {
     ).toBeDisabled();
   });
 
+  it("says that the review date ends at the end of that day in UTC", async () => {
+    await open();
+
+    expect(
+      within(screen.getByRole("dialog")).getByText(
+        /The day ends at the end of that date in UTC\./,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("sends the reason, the kind and the optional review date, then refreshes", async () => {
     let reads = 0;
     const user = await open({

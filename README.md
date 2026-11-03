@@ -105,6 +105,12 @@ the last scan, and the Run scan button. The dashboard has an Overview (a board o
 next and later), Findings (with a detail page for each), Resources and Scans. It only reads from the
 API and starts scans. It never changes anything in AWS.
 
+Open the dashboard at that exact address. The API refuses a write (a scan, a dismissal, an upload,
+a fix) that comes from any other web address, and `localhost` and `127.0.0.1` count as different
+addresses: the dashboard opened at http://127.0.0.1:5173 cannot start scans. To use another
+address, set `FRONTEND_ORIGIN` on the server to it. Scripts and `Invoke-RestMethod` send no origin
+and are not affected.
+
 The Overview headline reads "{N} fixed." and "{F} to fix now.". F counts the findings in the Fix
 now lane (risk score 80 or more) that are open, not dismissed, not merged and not informational,
 from CloudShield and from imported scans alike. Below it, the Next, Later, informational and
@@ -144,6 +150,11 @@ python -m cloudshield.imports check-runner
 
 See `docs/extended-checks.md` for the install steps and the settings.
 
+Instead of a local install, CloudShield can run the Prowler container: set `PROWLER_MODE=docker`
+in `.env` (Docker Desktop must be running). The same `check-runner` command then checks Docker and
+the image. Put `CLOUDSHIELD_DATA_DIR` outside OneDrive. See the Docker section of
+`docs/extended-checks.md`.
+
 If your computer blocks Prowler, run it somewhere else (for example AWS CloudShell) and import the
 file from the dashboard: choose "Import a results file" in the Run scan menu. The window shows the
 commands to run and takes the `.json` file. The same steps are in `docs/extended-checks.md`.
@@ -169,3 +180,34 @@ npm test
 ```
 
 Continuous integration also runs `ruff check` and `ruff format --check` on the Python code.
+
+### Browser tests (read-only)
+
+`web/e2e/` holds Playwright tests that open the real dashboard in your installed Google Chrome
+(or Microsoft Edge) against the real local API. They download no browser. In `web/`:
+
+```powershell
+npm run e2e
+```
+
+If the API (127.0.0.1:8000) and the dev server (localhost:5173) are not running, the command starts
+them with `.venv\Scripts\python.exe` and stops them afterwards; servers that are already running
+are reused. The tests read the data that is in your database and skip a test, with the reason, when
+the data it needs is missing (for example no imported finding). Type-check them with
+`npm run typecheck:e2e`.
+
+They only read. Every request to `/api` that is not a GET is stopped and fails the test with its
+URL, and any console error, page error or failed request fails it too. They never press Run scan,
+Run full scan, Generate fix, Dismiss or the upload.
+
+What they do not cover:
+
+- The text of an imported fix ("What to do", "Plain words", the formatted guidance) and the
+  stored fix of a CloudShield finding. The page shows them only after Generate fix, which sends a
+  POST. That test is listed as skipped.
+- Anything that writes: scans, dismissals, uploads, rescans.
+- Visual design, screen sizes other than the default, and browsers other than Chrome or Edge.
+- Windows is assumed: the Chrome and Edge paths and the virtual environment path are Windows ones.
+- Opening the Run scan menu makes the API check the extended runner (`/api/extended/status`),
+  which in Docker mode runs `docker version` and `docker image inspect`. It starts no scan and
+  no container.

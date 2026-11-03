@@ -2,7 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { CertaintyChip } from "../components/ui";
 import { formatDate } from "../format";
-import { finding, findingDetail, fix, scan, summary } from "../test/factories";
+import { finding, findingDetail, fix, scan } from "../test/factories";
 import { callsTo } from "../test/mockApi";
 import { renderApp } from "../test/render";
 
@@ -158,7 +158,6 @@ describe("Overview: lanes show at most five tiles", () => {
   const routes = (rows: ReturnType<typeof many>) => ({
     "GET /api/scans": [scan()],
     "GET /api/findings": rows,
-    "GET /api/risk/summary": summary(),
   });
 
   it("shows five tiles and a See all link to that lane when a lane has more", async () => {

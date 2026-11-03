@@ -3,10 +3,12 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from functools import partial
 from importlib.metadata import version
+from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from cloudshield.api.jobs import JobLock, scan_with_boto3
 from cloudshield.api.routes import router
@@ -15,6 +17,22 @@ from cloudshield.db import store
 from cloudshield.db.session import make_engine, make_session_factory
 from cloudshield.fixes.explain import HourlyLimit
 from cloudshield.imports.runner import RunOutput, StatusCache, check_runner, run_prowler
+
+
+DEFAULT_PORTS = {"http": 80, "https": 443}
+
+
+def same_origin(origin: str, allowed: str) -> bool:
+    """Scheme, host and port must all be equal. localhost and 127.0.0.1 are different origins."""
+
+    def key(value: str) -> tuple:
+        parts = urlparse(value)
+        return parts.scheme, parts.hostname, parts.port or DEFAULT_PORTS.get(parts.scheme)
+
+    try:
+        return key(origin) == key(allowed)
+    except ValueError:  # a port that is not a number
+        return False
 
 
 @asynccontextmanager
@@ -45,6 +63,22 @@ def create_app(
         allow_headers=["Content-Type", "X-Filename"],
     )
     app.state.settings = settings
+
+    # A browser sends a body-less POST from any web page without asking first, so CORS alone does
+    # not stop another site from starting a scan. A request without an Origin header (a script,
+    # curl) is not from a web page and stays allowed.
+    @app.middleware("http")
+    async def refuse_foreign_origin(request: Request, call_next):
+        origin = request.headers.get("origin")
+        writes = request.method not in ("GET", "OPTIONS")
+        if writes and origin is not None and not same_origin(origin, settings.frontend_origin):
+            detail = (
+                "This request came from another origin. "
+                f"Open the dashboard at {settings.frontend_origin}."
+            )
+            return JSONResponse(status_code=403, content={"detail": detail})
+        return await call_next(request)
+
     engine = make_engine(database_url or settings.database_url)
     app.state.session_factory = make_session_factory(engine)
     app.state.scan_function = scan_function or scan_with_boto3

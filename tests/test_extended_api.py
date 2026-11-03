@@ -15,6 +15,7 @@ from cloudshield.db.models import Base, ImportRow
 from cloudshield.db.session import make_engine
 from cloudshield.imports import __main__ as import_cli
 from cloudshield.imports.runner import (
+    EXPIRED_HINT,
     PERMISSION_HINT,
     ExtendedError,
     RunnerStatus,
@@ -342,6 +343,7 @@ def test_the_status_endpoint_says_whether_the_extended_checks_can_run(tmp_path):
         "reason": None,
         "hint": None,
         "blocked": False,
+        "warning": None,
         "install_command": "pip install prowler",
         "run_command": None,
     }
@@ -445,3 +447,22 @@ def test_the_migration_keeps_earlier_scans_and_imports(tmp_path, monkeypatch):
     assert old["duration_seconds"] is None
     assert old["scan_id"] is None
     assert client.get("/api/findings").json() == []
+
+
+def test_an_expired_token_in_the_run_gives_the_sign_in_hint_but_keeps_the_results(tmp_path):
+    expired = RunOutput(
+        file_name="prowler-output-1.ocsf.json",
+        content=results_file(),
+        duration_seconds=1.0,
+        services=["s3"],
+        regions=["ap-southeast-2"],
+        saw_permission_errors=True,
+        saw_expired_credentials=True,
+    )
+    client = make_client(tmp_path, extended=lambda regions: expired)
+
+    scan = run_scan(client)
+
+    assert scan["extended_status"] == "ok"
+    assert scan["extended_hint"] == EXPIRED_HINT
+    assert len(findings(client, "prowler")) == 2

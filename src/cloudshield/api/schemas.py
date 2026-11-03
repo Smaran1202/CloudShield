@@ -192,6 +192,9 @@ class ImportOut(BaseModel):
     services_used: list[str] | None
     regions_used: list[str] | None
     scan_id: int | None
+    # How a dashboard run was made: local or docker, and the docker image. Null for a file.
+    run_mode: Literal["local", "docker"] | None
+    run_image: str | None
 
 
 class ExtendedStatusOut(BaseModel):
@@ -201,6 +204,8 @@ class ExtendedStatusOut(BaseModel):
     hint: str | None
     # True when an operating-system policy stops the second scanner from running here.
     blocked: bool
+    # Something that may stop a run although it looks possible, such as a data folder in OneDrive.
+    warning: str | None
     # The commands to run the second scanner somewhere else. run_command is empty when no
     # region is set on the server, because it is built from the same settings as a run.
     install_command: str
@@ -227,19 +232,6 @@ class ImportedResourceOut(BaseModel):
     region: str | None
     open_count: int
     highest_risk: int | None
-
-
-class RiskSummaryOut(BaseModel):
-    environment_score: float
-    counts_by_severity: dict[str, int]
-    top_findings: list[FindingOut]
-
-
-class TrendPoint(BaseModel):
-    scan_id: int
-    finished_at: UtcDateTime
-    environment_score: float
-    severity_counts: dict[str, int]
 
 
 class PatchFile(BaseModel):

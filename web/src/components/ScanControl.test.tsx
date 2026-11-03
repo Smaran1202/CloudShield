@@ -109,6 +109,26 @@ describe("Run scan: the split button", () => {
     expect(screen.getByRole("menuitem", { name: /^Run scan/ })).toBeEnabled();
   });
 
+  it("keeps the full scan enabled but shows the hint and the warning in docker mode", async () => {
+    await openMenu({
+      "GET /api/extended/status": {
+        available: true,
+        version: "Docker, image toniblyx/prowler:latest",
+        reason: "The image toniblyx/prowler:latest is not downloaded yet.",
+        hint: "The first run downloads the image and may take several minutes.",
+        warning: "The data folder is inside OneDrive.",
+      },
+    });
+
+    const full = await screen.findByRole("menuitem", { name: /Run full scan/ });
+    const note = await screen.findByRole("note");
+
+    expect(full).toBeEnabled();
+    expect(note).toHaveTextContent("not downloaded yet");
+    expect(note).toHaveTextContent("several minutes");
+    expect(note).toHaveTextContent("inside OneDrive");
+  });
+
   it("keeps the full scan disabled while it checks, and when the check itself fails", async () => {
     await openMenu({ "GET /api/extended/status": never });
 
