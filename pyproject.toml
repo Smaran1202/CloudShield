@@ -24,6 +24,7 @@ dev = [
     "pytest",
     "ruff",
     "moto[ec2,iam,s3]",
+    "pyyaml",
 ]
 
 [tool.setuptools.packages.find]

@@ -11,7 +11,11 @@ export type ScoreBasis = "severity only" | "context adjusted";
 export type Disposition = "none" | "accepted" | "not_applicable";
 export type ScanStatus = "queued" | "running" | "completed" | "failed";
 export type ExtendedStatus = "ok" | "failed" | "unavailable" | "skipped";
-export type PatchFormat = "terraform" | "cloudformation" | "cli";
+export type PatchFormat = "terraform" | "cloudformation" | "cli" | "github_actions";
+export type GuardrailKind =
+  "account_setting" | "pipeline_check" | "detective_rule" | "organization_policy";
+export type GuardrailScope = "resource" | "account" | "organization";
+export type GuardrailStatus = "active" | "not_active" | "unknown" | "needs_org_admin";
 
 export const SEVERITIES: Severity[] = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
 
@@ -173,12 +177,29 @@ export interface ExplanationOut {
   skipped_reason: string | null;
 }
 
+// Something that stops a finding coming back. Its status is read from the last scan.
+export interface GuardrailOut {
+  id: string;
+  title: string;
+  kind: GuardrailKind;
+  prevents: string;
+  scope: GuardrailScope;
+  patches: PatchOut[];
+  affects: string;
+  cost: string;
+  docs_url: string;
+  status: GuardrailStatus;
+  status_reason: string;
+}
+
 export interface FixOut {
   finding_id: string;
   evidence_hash: string;
   patches: PatchOut[];
   guidance: string[];
   pre_checks: string[];
+  // Only for CloudShield's own findings.
+  guardrails: GuardrailOut[];
   // What CloudShield does not look at for this rule.
   not_checked: string[];
   cloudshield_steps: CloudShieldSteps | null;
@@ -336,6 +357,7 @@ export const api = {
     request<FindingDetailOut>(`/api/findings/${encodeURIComponent(id)}`),
   riskSummary: () => request<RiskSummaryOut>("/api/risk/summary"),
   riskTrend: () => request<TrendPoint[]>("/api/risk/trend"),
+  guardrails: () => request<GuardrailOut[]>("/api/guardrails"),
   generateFix: (id: string, refresh = false) =>
     request<FixOut>(`/api/findings/${encodeURIComponent(id)}/fix?refresh=${refresh}`, {
       method: "POST",

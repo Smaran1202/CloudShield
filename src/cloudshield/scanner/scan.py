@@ -1,3 +1,4 @@
+from cloudshield.scanner.account import collect_account_settings
 from cloudshield.scanner.ec2 import collect_instances
 from cloudshield.scanner.iam import collect_policies, collect_roles
 from cloudshield.scanner.s3 import collect_buckets
@@ -18,4 +19,5 @@ def scan_account(session, regions: list[str]) -> dict:
                 profile_arns.append(profile_arn)
     resources += collect_policies(session, errors)
     resources += collect_roles(session, profile_arns, errors)
-    return {"resources": resources, "errors": errors}
+    account_settings = collect_account_settings(session, (regions or ["us-east-1"])[0], errors)
+    return {"resources": resources, "errors": errors, "account_settings": account_settings}

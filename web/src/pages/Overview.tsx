@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { api, type EvidenceItem, type FindingOut, type ScanOut } from "../api";
+import {
+  api,
+  type EvidenceItem,
+  type FindingOut,
+  type GuardrailOut,
+  type GuardrailStatus,
+  type ScanOut,
+} from "../api";
 import { CopyButton } from "../components/CopyButton";
 import { Icon } from "../components/Icon";
 import {
@@ -115,6 +122,30 @@ export function certaintySummary(items: EvidenceItem[]): string {
   return parts.length > 0 ? parts.join(", ") : "No evidence stored yet";
 }
 
+// How many guardrails are verified active, and how many CloudShield cannot see.
+function GuardrailLine() {
+  const [guardrails, reload] = useAsync(() => api.guardrails());
+  useRefreshWhenScanEnds(reload);
+  if (guardrails.status === "loading") return null;
+  const text =
+    guardrails.status === "error"
+      ? "Guardrails: could not be read."
+      : `Guardrails: ${countOf(guardrails.data, "active")} active, ${countOf(guardrails.data, "unknown")} unknown.`;
+  return (
+    <p
+      data-testid="guardrail-line"
+      className="rise mt-3 text-secondary text-dim"
+      style={{ animationDelay: "500ms" }}
+    >
+      {text}
+    </p>
+  );
+}
+
+function countOf(guardrails: GuardrailOut[], status: GuardrailStatus): number {
+  return guardrails.filter((g) => g.status === status).length;
+}
+
 function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
   const counts = countLanes(rows);
   const active = rows.filter(isActive);
@@ -196,6 +227,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
             {LANE_THRESHOLDS.next}. CloudShield never changes your AWS account: you apply
             every fix yourself.
           </p>
+          <GuardrailLine />
         </div>
         {top && <FixNextCard finding={top} />}
       </div>

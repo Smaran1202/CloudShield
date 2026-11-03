@@ -89,6 +89,7 @@ def save_result(
     save_findings(session, scan_id, findings, now)
     resolve_fixed(session, scan, result, {f.finding_id for f in findings}, now)
     scan.errors = result["errors"]
+    scan.account_settings = result.get("account_settings", {})
     resolve_gone_resources(session, scan, ACCOUNT_ID, now)
     session.flush()
     reconcile(session, ACCOUNT_ID, scan)

@@ -2,6 +2,7 @@ import type {
   FindingDetailOut,
   FindingOut,
   FixOut,
+  GuardrailOut,
   ResourceOut,
   RiskSummaryOut,
   ScanOut,
@@ -175,6 +176,44 @@ export function trend(): TrendPoint[] {
   ];
 }
 
+export function guardrail(overrides: Partial<GuardrailOut> = {}): GuardrailOut {
+  return {
+    id: "s3-account-block-public-access",
+    title: "Block public access for the whole account",
+    kind: "account_setting",
+    prevents: "Stops any bucket in the account from being made public.",
+    scope: "account",
+    patches: [
+      {
+        format: "terraform",
+        title: "Block public access for the whole account (Terraform)",
+        content: 'resource "aws_s3_account_public_access_block" "account" {}\n',
+        files: [],
+        needs_input: false,
+        inputs_needed: [],
+        instructions_only: false,
+      },
+      {
+        format: "cli",
+        title: "Block public access for the whole account (AWS CLI)",
+        content:
+          "aws s3control put-public-access-block --account-id REPLACE_WITH_YOUR_ACCOUNT_ID\n",
+        files: [],
+        needs_input: true,
+        inputs_needed: ["Your 12-digit AWS account id"],
+        instructions_only: false,
+      },
+    ],
+    affects: "Applies to every bucket in the account.",
+    cost: "Check pricing.",
+    docs_url:
+      "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html",
+    status: "unknown",
+    status_reason: "The last scan could not read it (access denied or an error).",
+    ...overrides,
+  };
+}
+
 export function fix(overrides: Partial<FixOut> = {}): FixOut {
   return {
     finding_id: "F-CIS-SG-001-aaaaaaaa",
@@ -204,6 +243,7 @@ export function fix(overrides: Partial<FixOut> = {}): FixOut {
       },
     ],
     guidance: [],
+    guardrails: [],
     pre_checks: ["Find out who connects to the instances today."],
     rollback:
       "To add the rules back, using the same JSON files: aws ec2 authorize-security-group-ingress",

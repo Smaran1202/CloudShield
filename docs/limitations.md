@@ -92,6 +92,13 @@
   public bucket rule, flow logs and other users of a security group, CloudTrail and last-accessed
   data for IAM). The fix page shows both, and the explanation must name what was not checked and
   never call a change safe.
+- Guardrails ("Prevent it coming back") are text for you to apply, like a fix. See `guardrails.md`.
+  Only one can be verified: the account-wide S3 public access block, which a scan reads. A
+  guardrail is "active" only when a scan read it and found all four settings on. Everything else
+  is "unknown" (CloudShield cannot see your pipeline or AWS Config rules, and there is no way to
+  confirm them yet), or "needs organization admin" (no organization policy can be verified in
+  this account, because only the management account can read them). A missing permission or a
+  failed read also gives "unknown".
 - The AI explanation is optional text. It is checked against the data, but not every invented name
   can be detected. See `ai-data.md`.
 - The hourly AI limit is counted in the memory of one server process and starts again when the

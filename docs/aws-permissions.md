@@ -9,6 +9,8 @@ needs no permission.
 |---|---|---|---|
 | S3 | `list_buckets` | `s3:ListAllMyBuckets` | list the buckets |
 | S3 | `get_bucket_location` | `s3:GetBucketLocation` | the bucket's region |
+| S3 Control | `get_public_access_block` | `s3:GetAccountPublicAccessBlock` | the account-wide public access block, to show whether that guardrail is active |
+| STS | `get_caller_identity` | none needed | the account id that the S3 Control call requires |
 | S3 | `get_public_access_block` | `s3:GetBucketPublicAccessBlock` | public access block settings |
 | S3 | `get_bucket_encryption` | `s3:GetEncryptionConfiguration` | default encryption |
 | S3 | `get_bucket_versioning` | `s3:GetBucketVersioning` | versioning status |
@@ -23,6 +25,10 @@ needs no permission.
 | IAM | `list_attached_role_policies` | `iam:ListAttachedRolePolicies` | managed policies on a role |
 | IAM | `list_role_policies` | `iam:ListRolePolicies` | names of inline policies on a role |
 | IAM | `get_role_policy` | `iam:GetRolePolicy` | inline policy documents |
+
+The account-wide read was added with the guardrails. If you made the policy before that, add
+`s3:GetAccountPublicAccessBlock` to it. Without it the scan still works, and the "Block public
+access for the whole account" guardrail shows as unknown.
 
 If a call is denied the scanner does not stop. It records an error entry and the result shows
 which action was missing, so a denied action is never reported as "nothing there".

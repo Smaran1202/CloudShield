@@ -28,6 +28,9 @@ class ScanRow(Base):
     environment_score: Mapped[float | None]  # from the open findings when the scan finished
     severity_counts: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     errors: Mapped[list] = mapped_column(JSON, default=list)
+    # Account-wide settings this scan could read, for example the account's S3 Block Public
+    # Access. A key that is missing could not be read.
+    account_settings: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     failure_message: Mapped[str | None]
     # How the extended checks (Prowler) went: ok, failed, unavailable or skipped.
     extended_status: Mapped[str] = mapped_column(default="skipped", server_default="skipped")

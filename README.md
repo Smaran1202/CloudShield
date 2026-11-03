@@ -81,6 +81,13 @@ Invoke-RestMethod -Method Post "http://localhost:8000/api/findings/$id/fix"
 python -m cloudshield.fixes export $id --dir fixes-out
 ```
 
+The export also writes the guardrails for the finding, under `fixes-out/guardrails/`: ready-to-copy
+files that stop the problem coming back, such as a GitHub Actions workflow or a setting for the
+whole account. The Fix tab shows them under "Prevent it coming back", each with a status read from
+your last scan. See `docs/guardrails.md`. The scan now also reads the account-wide S3 public access
+block, so add `s3:GetAccountPublicAccessBlock` to your read-only policy
+(`docs/aws-readonly-policy.json`).
+
 An AI explanation is optional. Set `GEMINI_API_KEY`, `GEMINI_MODEL` and, if you want one,
 `GEMINI_FALLBACK_MODEL` in the API's environment. Without them a fixed template explanation is
 used. See `docs/ai-data.md` for exactly what is sent. To test the settings, run

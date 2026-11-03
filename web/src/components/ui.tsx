@@ -4,6 +4,7 @@ import type {
   FindingOut,
   FindingSource,
   FindingStatus,
+  GuardrailStatus,
   ScanStatus,
   Severity,
 } from "../api";
@@ -127,6 +128,39 @@ export function CertaintyChip({ certainty }: { certainty: Certainty }) {
     >
       <Icon name={CERTAINTY_ICON[certainty]} size={16} />
       {certainty}
+    </span>
+  );
+}
+
+const GUARDRAIL_STATUS: Record<
+  GuardrailStatus,
+  { label: string; icon: IconName; style: string }
+> = {
+  active: { label: "Active", icon: "check", style: "bg-chip-ok-bg text-chip-ok-text" },
+  not_active: {
+    label: "Not active",
+    icon: "alert",
+    style: "bg-chip-warn-bg text-chip-warn-text",
+  },
+  unknown: {
+    label: "Unknown",
+    icon: "question",
+    style: "bg-chip-unknown-bg text-chip-unknown-text",
+  },
+  needs_org_admin: {
+    label: "Needs organization admin",
+    icon: "shield",
+    style: "border-2 border-ink bg-white text-ink",
+  },
+};
+
+// Icon and label, so the status is never carried by colour alone.
+export function GuardrailStatusChip({ status }: { status: GuardrailStatus }) {
+  const { label, icon, style } = GUARDRAIL_STATUS[status];
+  return (
+    <span className={`${CHIP} gap-2 ${style}`} data-status={status}>
+      <Icon name={icon} size={16} />
+      {label}
     </span>
   );
 }

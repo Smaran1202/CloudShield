@@ -2,10 +2,11 @@ import argparse
 from pathlib import Path
 
 from cloudshield.config import Settings, load_env_file
-from cloudshield.db.models import ACCOUNT_ID, FixRow
+from cloudshield.db.models import ACCOUNT_ID, FindingRow, FixRow
 from cloudshield.db.session import make_engine, make_session_factory
 from cloudshield.fixes.ai_check import run_ai_check
-from cloudshield.fixes.export import explanation_line, write_fix_files
+from cloudshield.fixes.export import explanation_line, write_fix_files, write_guardrail_files
+from cloudshield.guardrails.catalog import guardrails_for
 
 
 def export_fix(finding_id: str, directory: str) -> int:
@@ -21,6 +22,10 @@ def export_fix(finding_id: str, directory: str) -> int:
     skipped = fix.explanation.get("skipped_reason")
     note = explanation_line(fix.generated_by, fix.model, skipped)
     written = write_fix_files(finding_id, fix.patches, Path(directory), note)
+    with make_session_factory(engine)() as session:
+        finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
+    if finding is not None and finding.source != "prowler":
+        written += write_guardrail_files(guardrails_for(finding.rule_id), Path(directory))
     if not written:
         print("This finding has no patch files. Its guidance is in the API response.")
     for path in written:

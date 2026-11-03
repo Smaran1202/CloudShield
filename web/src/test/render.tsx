@@ -10,6 +10,7 @@ export const BASE = {
   "GET /api/scans": [],
   "GET /api/imports": [],
   "GET /api/resources/imported": [],
+  "GET /api/guardrails": [],
   "GET /api/extended/status": {
     available: true,
     version: "5",

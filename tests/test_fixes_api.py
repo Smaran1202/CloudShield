@@ -351,6 +351,7 @@ def test_export_writes_the_patch_files_with_a_review_header(tmp_path, monkeypatc
         "fix.ps1",
         "fix.tf",
         "fix.yaml",
+        "guardrails",
         "sg-0abc123-rule1.json",
     ]
     assert "Review this file before you use it" in script
@@ -388,16 +389,21 @@ def test_export_without_a_stored_fix_explains_what_to_do(tmp_path, monkeypatch):
     assert not (tmp_path / "out").exists()
 
 
-def test_export_for_a_guidance_only_finding_writes_no_files(tmp_path, monkeypatch, capsys):
+def test_export_for_a_guidance_only_finding_writes_only_its_guardrail_files(
+    tmp_path, monkeypatch
+):
     client = make_client(tmp_path)
     seed(client, [wildcard_policy()])
     fid = finding_id(client, "CIS-IAM-001")
     client.post(f"/api/findings/{fid}/fix")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
+    out = tmp_path / "out"
 
-    export_main(["export", fid, "--dir", str(tmp_path / "out")], load_env=False)
+    export_main(["export", fid, "--dir", str(out)], load_env=False)
 
-    assert "no patch files" in capsys.readouterr().out
+    assert sorted(p.name for p in out.iterdir()) == ["guardrails"]
+    workflow = out / "guardrails" / "pipeline-iam-validate-policy" / "workflow.yml"
+    assert "aws accessanalyzer validate-policy" in workflow.read_text(encoding="utf-8")
 
 
 def test_fixes_are_stored_with_account_id_local(tmp_path):

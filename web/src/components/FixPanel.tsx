@@ -1,6 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { CloudShieldSteps, FindingDetailOut, FixOut, PatchOut } from "../api";
+import type {
+  CloudShieldSteps,
+  FindingDetailOut,
+  FixOut,
+  GuardrailKind,
+  GuardrailOut,
+  GuardrailScope,
+  PatchOut,
+} from "../api";
 import { Icon } from "./Icon";
 import type { FixState } from "../useFixRequest";
 import type { Verify } from "../useVerify";
@@ -8,6 +16,7 @@ import {
   Card,
   CertaintyChip,
   ErrorBox,
+  GuardrailStatusChip,
   Loading,
   PRIMARY_BUTTON,
   SECONDARY_BUTTON,
@@ -158,6 +167,7 @@ export function FixTab({
             </div>
           </Card>
         )}
+        {details && !imported && <Guardrails guardrails={details.guardrails} />}
         {details && imported && <PlainWords text={plainText(details, finding)} />}
       </div>
 
@@ -344,13 +354,81 @@ function Explanation({
   );
 }
 
-function PatchPanel({ patches }: { patches: PatchOut[] }) {
+const KIND_LABEL: Record<GuardrailKind, string> = {
+  account_setting: "Account setting",
+  pipeline_check: "Pipeline check",
+  detective_rule: "Detective rule",
+  organization_policy: "Organization policy",
+};
+
+const SCOPE_LABEL: Record<GuardrailScope, string> = {
+  resource: "One resource",
+  account: "Whole account",
+  organization: "Whole organization",
+};
+
+// What stops this finding coming back. Imported findings never get this section.
+function Guardrails({ guardrails }: { guardrails: GuardrailOut[] }) {
+  if (guardrails.length === 0) return null;
+  return (
+    <section aria-label="Prevent it coming back" className="space-y-4">
+      <SectionTitle>Prevent it coming back</SectionTitle>
+      <p className="text-secondary text-dim">
+        Apply the fix first, then a guardrail stops it returning. CloudShield never
+        changes your account.
+      </p>
+      {guardrails.map((guardrail) => (
+        <GuardrailCard key={guardrail.id} guardrail={guardrail} />
+      ))}
+    </section>
+  );
+}
+
+function GuardrailCard({ guardrail }: { guardrail: GuardrailOut }) {
+  return (
+    <article aria-label={guardrail.title}>
+      <Card className="space-y-4">
+        <h3 className="font-display text-title font-bold">{guardrail.title}</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <GuardrailStatusChip status={guardrail.status} />
+          <Tag>{KIND_LABEL[guardrail.kind]}</Tag>
+          <Tag>{SCOPE_LABEL[guardrail.scope]}</Tag>
+        </div>
+        <p className="text-secondary text-dim">{guardrail.status_reason}</p>
+        <p className="text-secondary">{guardrail.prevents}</p>
+        <Block title="What this affects">
+          <p className="text-secondary">{guardrail.affects}</p>
+        </Block>
+        <Block title="Cost">
+          <p className="text-secondary">{guardrail.cost}</p>
+        </Block>
+        <PatchPanel patches={guardrail.patches} title={guardrail.title} />
+        <a
+          href={guardrail.docs_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block font-semibold break-all underline"
+        >
+          AWS documentation
+        </a>
+      </Card>
+    </article>
+  );
+}
+
+// With a title it is the patches of one guardrail, so each panel has its own name.
+function PatchPanel({ patches, title }: { patches: PatchOut[]; title?: string }) {
   const [active, setActive] = useState(patches[0].format);
   const patch = patches.find((p) => p.format === active) ?? patches[0];
+  const name = title ? `Patches for ${title}` : "Patches";
 
   return (
-    <section aria-label="Patches" className="rounded-lane bg-ink p-6 text-white">
-      <h2 className="font-display text-h3 font-extrabold">Patches</h2>
+    <section aria-label={name} className="rounded-lane bg-ink p-6 text-white">
+      {title ? (
+        <h4 className="font-display text-title font-bold">Patches</h4>
+      ) : (
+        <h2 className="font-display text-h3 font-extrabold">Patches</h2>
+      )}
       <div role="tablist" aria-label="Patch format" className="mt-4 flex flex-wrap gap-2">
         {patches.map((p) => (
           <button

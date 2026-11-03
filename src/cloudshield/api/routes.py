@@ -18,6 +18,7 @@ from cloudshield.api.schemas import (
     FindingOut,
     FindingSource,
     FixOut,
+    GuardrailOut,
     ImportedResourceOut,
     ImportOut,
     ImportResultOut,
@@ -48,7 +49,10 @@ from cloudshield.findings import SEVERITIES, FindingStatus, Severity
 from cloudshield.fixes.explain import redact
 from cloudshield.fixes.service import make_fix
 from cloudshield.fixes.templates import NOT_CHECKED
+from cloudshield.guardrails.catalog import GUARDRAILS, guardrails_for
+from cloudshield.guardrails.status import guardrail_status
 from cloudshield.imports.guidance import guidance_for
+from cloudshield.imports.merge import latest_completed_scan
 from cloudshield.imports.parser import MAX_BYTES, AlreadyImported, ImportRejected
 from cloudshield.imports.recheck import latest_import_id
 from cloudshield.imports.runner import INSTALL_COMMAND, ExtendedError, cloudshell_command
@@ -272,7 +276,12 @@ def get_finding(
     return finding
 
 
-def fix_out(row: FixRow, finding: FindingRow) -> FixOut:
+def guardrail_out(guardrail: dict, scan: ScanRow | None) -> GuardrailOut:
+    status, reason = guardrail_status(guardrail, scan)
+    return GuardrailOut(**guardrail, status=status, status_reason=reason)
+
+
+def fix_out(row: FixRow, finding: FindingRow, session: Session) -> FixOut:
     """The stored fix, with the parts that are read from CloudShield's own data each time."""
     out = FixOut.model_validate(row)
     if finding.source == "prowler":
@@ -280,7 +289,16 @@ def fix_out(row: FixRow, finding: FindingRow) -> FixOut:
         out.cloudshield_steps = CloudShieldSteps(**steps) if steps else None
     else:
         out.not_checked = NOT_CHECKED.get(finding.rule_id, [])
+        scan = latest_completed_scan(session, ACCOUNT_ID)
+        out.guardrails = [guardrail_out(g, scan) for g in guardrails_for(finding.rule_id)]
     return out
+
+
+@router.get("/guardrails", response_model=list[GuardrailOut])
+def list_guardrails(session: Annotated[Session, Depends(get_session)]) -> list[GuardrailOut]:
+    """Every guardrail CloudShield knows, with its status from the last completed scan."""
+    scan = latest_completed_scan(session, ACCOUNT_ID)
+    return [guardrail_out(g, scan) for g in GUARDRAILS.values()]
 
 
 @router.post("/findings/{finding_id}/fix", response_model=FixOut)
@@ -297,7 +315,7 @@ def create_fix(
         stored = session.get(FixRow, (ACCOUNT_ID, finding_id))
         if stored is None:
             raise HTTPException(status_code=409, detail="This finding is resolved and has no fix.")
-        return fix_out(stored, finding)
+        return fix_out(stored, finding, session)
     state = request.app.state
     try:
         row = make_fix(
@@ -305,7 +323,7 @@ def create_fix(
         )
     except LookupError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return fix_out(row, finding)
+    return fix_out(row, finding, session)
 
 
 @router.get("/findings/{finding_id}/fix", response_model=FixOut)
@@ -314,7 +332,7 @@ def get_stored_fix(finding_id: str, session: Annotated[Session, Depends(get_sess
     finding = session.get(FindingRow, (ACCOUNT_ID, finding_id))
     if fix is None or finding is None:
         raise HTTPException(status_code=404, detail="No stored fix for this finding.")
-    return fix_out(fix, finding)
+    return fix_out(fix, finding, session)
 
 
 @router.patch("/findings/{finding_id}/disposition", response_model=FindingOut)

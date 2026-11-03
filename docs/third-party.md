@@ -19,6 +19,14 @@ imported as a library and nothing from it is copied into this repository.
 No Prowler code, check metadata or knowledge files are copied into this repository. The test
 fixtures are written by hand and only follow the shape of the output.
 
+## Checkov
+
+The pipeline-check guardrails (see `docs/guardrails.md`) are GitHub Actions files that install and
+run [Checkov](https://github.com/bridgecrewio/checkov), an open source infrastructure-as-code
+scanner licensed under the Apache License 2.0. CloudShield does not run it and does not bundle it.
+The files only name its check ids (`CKV_AWS_21` and `CKV_AWS_24`), which were read in its
+documentation on 2026-11-02.
+
 ## OCSF
 
 The imported file uses the [Open Cybersecurity Schema Framework](https://ocsf.io) (OCSF)

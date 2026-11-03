@@ -16,7 +16,12 @@ ExtendedStatus = Literal["ok", "failed", "unavailable", "skipped"]
 FindingSource = Literal["cloudshield", "prowler"]
 ScoreBasis = Literal["severity only", "context adjusted"]
 Disposition = Literal["none", "accepted", "not_applicable"]
-PatchFormat = Literal["terraform", "cloudformation", "cli"]
+PatchFormat = Literal["terraform", "cloudformation", "cli", "github_actions"]
+GuardrailKind = Literal[
+    "account_setting", "pipeline_check", "detective_rule", "organization_policy"
+]
+GuardrailScope = Literal["resource", "account", "organization"]
+GuardrailStatus = Literal["active", "not_active", "unknown", "needs_org_admin"]
 Region = Annotated[str, StringConstraints(pattern=r"^[a-z0-9-]+$")]
 # The database stores UTC without a timezone; the API always says it is UTC.
 UtcDateTime = Annotated[datetime, AfterValidator(lambda value: value.replace(tzinfo=UTC))]
@@ -276,6 +281,22 @@ class ExplanationOut(BaseModel):
     skipped_reason: str | None = None
 
 
+class GuardrailOut(BaseModel):
+    """Something that stops a finding coming back. Its status is read from the last scan."""
+
+    id: str
+    title: str
+    kind: GuardrailKind
+    prevents: str
+    scope: GuardrailScope
+    patches: list[PatchOut]
+    affects: str
+    cost: str
+    docs_url: str
+    status: GuardrailStatus
+    status_reason: str
+
+
 class FixOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -284,6 +305,8 @@ class FixOut(BaseModel):
     patches: list[PatchOut]
     guidance: list[str]
     pre_checks: list[str]
+    # Only for CloudShield's own findings. Not stored: read from the catalog and the last scan.
+    guardrails: list[GuardrailOut] = []
     # What CloudShield does not look at for this rule. Not stored: read from the rule.
     not_checked: list[str] = []
     # Only for an imported finding whose check has an entry. Not stored.
