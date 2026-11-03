@@ -389,9 +389,7 @@ def test_export_without_a_stored_fix_explains_what_to_do(tmp_path, monkeypatch):
     assert not (tmp_path / "out").exists()
 
 
-def test_export_for_a_guidance_only_finding_writes_only_its_guardrail_files(
-    tmp_path, monkeypatch
-):
+def test_export_for_a_guidance_only_finding_writes_only_its_guardrail_files(tmp_path, monkeypatch):
     client = make_client(tmp_path)
     seed(client, [wildcard_policy()])
     fid = finding_id(client, "CIS-IAM-001")
