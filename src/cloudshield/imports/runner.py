@@ -182,9 +182,7 @@ def checked_names(values: list[str], what: str) -> list[str]:
     return values
 
 
-def prowler_arguments(
-    services: list[str], regions: list[str], output_dir: str | None
-) -> list[str]:
+def prowler_arguments(services: list[str], regions: list[str], output_dir: str | None) -> list[str]:
     """The part of the command after the program that starts Prowler. The container has no -o:
     it writes to its own output folder, which is the mounted one."""
     output = ["-o", output_dir] if output_dir else []
