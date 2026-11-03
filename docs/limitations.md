@@ -165,6 +165,19 @@
   could not read this setting, so the two results are not compared." The comparison is made
   again after the next scan that reads the setting. Partial matches, such as the IAM wildcard check, never merge. Every other pair of
   imported and own findings is shown twice, each with its source.
+- If the scan read the account-wide Block Public Access and all four settings are on, a bucket with
+  an incomplete block of its own is not given the S3 exposure +15 (the factor is listed with
+  adjustment 0). The finding stays open, with its severity, and shows "Mitigated by the account-wide
+  block". If that read failed, was denied or is missing, nothing changes. Imported S3 findings are
+  scored from our stored bucket data and do not use this: they keep the +15. Where the imported
+  check passes and ours is open, the evidence says the imported check may count the account-wide
+  block and may look at only two of the four settings. That is **unverified**: it was not checked
+  against the imported check's own documentation.
+- The dashboard shows a run of exactly 12 digits as its last four digits behind a mask, in finding
+  titles, in evidence and in imported text. It changes the display only: stored data, API replies,
+  copied text and the patches are not changed. It is not a guarantee: the full resource id (an ARN
+  with the account id) is still shown on the Summary tab, in tooltips and in the resource pages, and
+  any other 12-digit number is masked too.
 - A finding can be dismissed as accepted or not applicable, with a reason of at least 10
   characters and an optional end date. A dismissal "until" date ends at the end of that day in
   UTC, not in your own time zone. The finding then leaves the lanes and the headline counts, and

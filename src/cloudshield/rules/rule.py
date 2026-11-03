@@ -8,6 +8,7 @@ class Hit:
     details: dict
     variant: str = ""  # tells apart several findings on one resource
     severity: str | None = None  # overrides the rule severity for this finding
+    title: str | None = None  # overrides the rule title, to say which case fired
 
 
 @dataclass(frozen=True)

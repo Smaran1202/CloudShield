@@ -130,7 +130,7 @@ def test_fix_for_the_open_ssh_group_has_patches_not_checked_and_a_template_expla
     assert fix["not_checked"] == NOT_CHECKED["CIS-SG-001"]
     assert fix["cloudshield_steps"] is None
     assert "authorize-security-group-ingress" in fix["rollback"]
-    assert fix["verify"] == "Rescan (POST /api/scans). This finding should resolve."
+    assert fix["verify"] == "Run a scan to verify. This finding should resolve."
     assert fix["generated_by"] == "template"
     assert fix["model"] is None
     assert fix["explanation"]["cited"] == ["e1"]

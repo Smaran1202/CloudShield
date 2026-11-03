@@ -40,6 +40,7 @@ import {
   type Lane,
 } from "../lanes";
 import { useRefreshWhenScanEnds, useScans } from "../ScanContext";
+import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
 
 const HEADLINE =
@@ -186,7 +187,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
                   to={`/findings/${encodeURIComponent(top.finding_id)}`}
                   className="font-bold underline decoration-2 underline-offset-4"
                 >
-                  {top.title}
+                  {maskAccountIds(top.title)}
                 </Link>
                 .
               </>
@@ -386,7 +387,7 @@ function FixNextCard({ finding }: { finding: FindingOut }) {
         </div>
         <div className="min-w-0">
           <h3 className="font-display text-title leading-tight font-bold">
-            {finding.title}
+            {maskAccountIds(finding.title)}
           </h3>
           <p
             className="mt-2 truncate font-mono text-label text-dim"
@@ -485,7 +486,7 @@ function Tile({
           to={`/findings/${encodeURIComponent(finding.finding_id)}`}
           className="after:absolute after:inset-0 after:content-['']"
         >
-          {finding.title}
+          {maskAccountIds(finding.title)}
         </Link>
       </h3>
       <div className="mt-2 flex items-center gap-1">
@@ -517,7 +518,9 @@ function DoneStrip({ resolved }: { resolved: FindingOut[] }) {
     >
       <Check size={36} />
       <div className="min-w-0 flex-1">
-        <p className="font-display text-h3 font-extrabold">Fixed: {latest.title}</p>
+        <p className="font-display text-h3 font-extrabold">
+          Fixed: {maskAccountIds(latest.title)}
+        </p>
         <p className="truncate font-mono text-label" title={latest.resource_id}>
           {shortResource(latest.resource_id)}, resolved {formatDate(latest.resolved_at)}
         </p>
@@ -563,7 +566,7 @@ function ProgressCard({ resolved, total }: { resolved: FindingOut[]; total: numb
               to={`/findings/${encodeURIComponent(latest.finding_id)}`}
               className="font-semibold underline"
             >
-              {latest.title}
+              {maskAccountIds(latest.title)}
             </Link>
             , resolved {formatDate(latest.resolved_at)} (
             {formatRelative(latest.resolved_at)}).

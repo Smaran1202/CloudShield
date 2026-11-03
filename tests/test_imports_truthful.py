@@ -58,8 +58,10 @@ def bucket(block=ALL_OFF, versioning="Enabled", encryption=KMS) -> dict:
     return make_resource("my-bucket", "S3", "ap-southeast-2", "my-bucket", attributes)
 
 
-def scan(client, resources, errors=None) -> None:
+def scan(client, resources, errors=None, account_settings=None) -> None:
     result = {"resources": resources, "errors": errors or []}
+    if account_settings is not None:
+        result["account_settings"] = account_settings
     findings = score_findings(run_rules(resources), result, REGIONS)
     with client.app.state.session_factory() as session:
         created = store.create_scan(session, REGIONS)
@@ -804,3 +806,59 @@ def test_the_migration_keeps_earlier_data_and_fills_the_new_fields(tmp_path, mon
     assert history["findings_added"] == 2
     load(client, [entry(check="new")])
     assert len(listed(client)) == 4
+
+
+ACCOUNT_BLOCK_NOTE = (
+    "The account-wide block is on, which the imported check may count, and it may look at only "
+    "two of the four settings (unverified: see Prowler's check page)."
+)
+ACCOUNT_ON = {"s3_public_access_block": ALL_ON}
+
+
+def test_a_passing_import_while_the_account_block_is_on_adds_the_note_to_our_evidence(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket()], account_settings=ACCOUNT_ON)
+
+    load(client, [entry(check=BLOCK_CHECK, status="PASS")])
+
+    ours = by_rule(client, "CIS-S3-001")
+    assert ours["status"] == "OPEN"
+    assert ours["tools_disagree"] is True
+    assert ours["mitigated_by_account_block"] is True
+    note = next(i for i in ours["evidence"]["items"] if i["fact"] == ACCOUNT_BLOCK_NOTE)
+    assert note["certainty"] == "unknown"
+
+
+def test_the_note_is_not_added_when_the_account_block_was_not_read_as_on(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket()], account_settings={})
+
+    load(client, [entry(check=BLOCK_CHECK, status="PASS")])
+
+    ours = by_rule(client, "CIS-S3-001")
+    assert ours["tools_disagree"] is True
+    assert ACCOUNT_BLOCK_NOTE not in facts(ours)
+
+
+def test_the_note_is_not_added_when_the_imported_check_fails_too(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket()], account_settings=ACCOUNT_ON)
+
+    load(client, [entry(check=BLOCK_CHECK)])
+
+    assert ACCOUNT_BLOCK_NOTE not in facts(by_rule(client, "CIS-S3-001"))
+
+
+def test_the_note_goes_away_when_a_rescan_reads_the_account_block_as_off(tmp_path):
+    client = make_client(tmp_path)
+    scan(client, [bucket()], account_settings=ACCOUNT_ON)
+    load(client, [entry(check=BLOCK_CHECK, status="PASS")])
+    assert ACCOUNT_BLOCK_NOTE in facts(by_rule(client, "CIS-S3-001"))
+
+    one_off = {**ALL_ON, "BlockPublicAcls": False}
+    scan(client, [bucket()], account_settings={"s3_public_access_block": one_off})
+
+    ours = by_rule(client, "CIS-S3-001")
+    assert ACCOUNT_BLOCK_NOTE not in facts(ours)
+    assert ours["mitigated_by_account_block"] is False
+    assert ours["risk_score"] == 85

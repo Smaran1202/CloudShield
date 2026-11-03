@@ -119,6 +119,8 @@ export interface FindingOut {
   disposition_until: string | null;
   disposition_at: string | null;
   dismissed: boolean;
+  // The S3 exposure was left out because the account-wide Block Public Access is on.
+  mitigated_by_account_block: boolean;
   suggested_not_applicable: { reason: string } | null;
 }
 
@@ -173,7 +175,8 @@ export interface GuardrailOut {
   scope: GuardrailScope;
   patches: PatchOut[];
   affects: string;
-  cost: string;
+  // null when no cost is known. Then no cost line is shown.
+  cost: string | null;
   docs_url: string;
   status: GuardrailStatus;
   status_reason: string;

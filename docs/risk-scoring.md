@@ -30,6 +30,25 @@ is the base plus the adjustments, capped at 100. Each factor is
 When the condition is false the factor is still listed with `adjustment` 0 and a reason, for example
 "Not attached to any running EC2 instance in this scan."
 
+### Account-wide Block Public Access
+
+If the same scan read the account-wide Block Public Access settings and all four are on, a bucket
+whose own block is incomplete does not get the S3 exposure +15. The factor is still listed, with
+`adjustment` 0, certainty `verified` and the reason "Account-wide Block Public Access is on (read by
+the scan), so this bucket cannot be made public by an ACL or policy". The finding stays open and
+keeps its severity, because the bucket's own setting is still off. It gets one more evidence item
+with the account-wide settings and the bucket settings that are off, and the dashboard shows the chip
+"Mitigated by the account-wide block" on the finding and in the list.
+
+If the account read failed, was denied or is missing, or the account has no setting, or any one of
+the four is off, the exposure is added exactly as before. The setting in effect may come from an
+organization policy; the scan reads what is in effect for the account.
+
+When the imported twin of the check passes while ours is open, the finding's evidence also says that
+the account-wide block is on, which the imported check may count, and that it may look at only two of
+the four settings. **This is unverified.** It has not been checked against the imported check's own
+documentation page, so treat it as a possible explanation of the disagreement, not a fact.
+
 ## Lanes
 
 The dashboard places each open finding in a lane by its score: Fix now is 80 or more, Next is 60

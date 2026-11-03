@@ -21,6 +21,7 @@ import {
 import { formatDate, pretty, scoreSentence } from "../format";
 import { LANE_BACKGROUND, laneOf, shortResource } from "../lanes";
 import { useRefreshWhenScanEnds } from "../ScanContext";
+import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
 import { useFixRequest } from "../useFixRequest";
 import { useVerify } from "../useVerify";
@@ -62,7 +63,7 @@ export function FindingDetail() {
           <div className="rise mb-8 flex flex-wrap items-start justify-between gap-8">
             <div className="min-w-0 flex-1 basis-[420px]">
               <h1 className="font-display text-detail leading-none font-extrabold tracking-[-0.03em]">
-                {finding.title}
+                {maskAccountIds(finding.title)}
               </h1>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <StatusChip status={finding.status} />
@@ -235,7 +236,7 @@ function Evidence({
                 <span className="rounded-[4px] border-[1.5px] border-ink px-2 py-1 font-mono text-label">
                   {id}
                 </span>
-                <span className="font-semibold">{item.fact}</span>
+                <span className="font-semibold">{maskAccountIds(item.fact)}</span>
                 <CertaintyChip certainty={item.certainty} />
               </div>
               {item.certainty === "reported" && typeof item.value === "string" ? (
@@ -244,7 +245,7 @@ function Evidence({
                 </div>
               ) : (
                 <pre className="mt-3 overflow-x-auto font-mono text-secondary break-words whitespace-pre-wrap">
-                  {item.value === null ? "no value" : pretty(item.value)}
+                  {item.value === null ? "no value" : maskAccountIds(pretty(item.value))}
                 </pre>
               )}
               <p className="mt-3 text-secondary text-dim">

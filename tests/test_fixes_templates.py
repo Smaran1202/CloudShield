@@ -277,7 +277,7 @@ def test_iam_rules_give_guidance_and_no_patch():
 def test_every_fix_says_how_to_verify():
     fix = build_fix(finding("CIS-S3-003", {"versioning": "Disabled"}), bucket())
 
-    assert fix["verify"] == "Rescan (POST /api/scans). This finding should resolve."
+    assert fix["verify"] == "Run a scan to verify. This finding should resolve."
 
 
 def test_every_cli_command_starts_with_an_allowed_prefix():

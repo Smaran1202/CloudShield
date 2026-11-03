@@ -10,6 +10,7 @@ import type {
   PatchOut,
 } from "../api";
 import { Icon } from "./Icon";
+import { maskAccountIds } from "../mask";
 import type { FixState } from "../useFixRequest";
 import type { Verify } from "../useVerify";
 import {
@@ -399,9 +400,11 @@ function GuardrailCard({ guardrail }: { guardrail: GuardrailOut }) {
         <Block title="What this affects">
           <p className="text-secondary">{guardrail.affects}</p>
         </Block>
-        <Block title="Cost">
-          <p className="text-secondary">{guardrail.cost}</p>
-        </Block>
+        {guardrail.cost && (
+          <Block title="Cost">
+            <p className="text-secondary">{guardrail.cost}</p>
+          </Block>
+        )}
         <PatchPanel patches={guardrail.patches} title={guardrail.title} />
         <a
           href={guardrail.docs_url}
@@ -499,7 +502,7 @@ function Code({ text, label }: { text: string; label: string }) {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="flex justify-end">
         <button
           type="button"
@@ -518,7 +521,7 @@ function Code({ text, label }: { text: string; label: string }) {
       )}
       <pre
         tabIndex={0}
-        className="mt-2 overflow-x-auto font-mono text-label leading-[1.8] whitespace-pre"
+        className="mt-2 font-mono text-label leading-[1.8] [overflow-wrap:anywhere] whitespace-pre-wrap"
       >
         <code>{text}</code>
       </pre>
@@ -545,7 +548,7 @@ function EvidenceCard({ finding }: { finding: FindingDetailOut }) {
               <Link to={`?tab=evidence&item=e${index + 1}`} aria-label={`e${index + 1}`}>
                 <Tag>{`e${index + 1}`}</Tag>
               </Link>
-              <span className="font-semibold">{item.fact}</span>
+              <span className="font-semibold">{maskAccountIds(item.fact)}</span>
               <CertaintyChip certainty={item.certainty} />
             </li>
           ))}

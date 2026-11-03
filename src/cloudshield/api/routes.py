@@ -55,7 +55,7 @@ from cloudshield.imports.parser import MAX_BYTES, AlreadyImported, ImportRejecte
 from cloudshield.imports.recheck import latest_import_id
 from cloudshield.imports.runner import INSTALL_COMMAND, ExtendedError, cloudshell_command
 from cloudshield.imports.upload import ImportBusy, import_upload
-from cloudshield.risk.scoring import score_breakdown
+from cloudshield.risk.scoring import is_mitigated, score_breakdown
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
@@ -90,6 +90,7 @@ def finding_out(row: FindingRow, view: View) -> FindingOut:
     )
     out.score_breakdown = ScoreBreakdown(**breakdown) if breakdown else None
     out.dismissed = is_dismissed(row, view.now)
+    out.mitigated_by_account_block = is_mitigated(row.risk_factors)
     if row.disposition != "none" and not out.dismissed:
         # The disposition has expired, so the finding is open again.
         out.disposition = "none"

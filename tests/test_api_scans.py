@@ -492,3 +492,36 @@ def test_a_failed_scan_has_no_environment_score(tmp_path):
 
     assert scan["status"] == "failed"
     assert scan["environment_score"] is None
+
+
+def test_a_finding_made_safe_by_the_account_wide_block_is_flagged_but_stays_open(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    scanned = {
+        **result([bucket("a", "Enabled", open_block)]),
+        "account_settings": {"s3_public_access_block": ALL_ON},
+    }
+    client = make_client(tmp_path, scan_returning(scanned))
+    run_scan(client)
+
+    finding = findings_by_rule(client, "CIS-S3-001")[0]
+    detail = client.get(f"/api/findings/{finding['finding_id']}").json()
+
+    for shown in (finding, detail):
+        assert shown["mitigated_by_account_block"] is True
+        assert shown["status"] == "OPEN"
+        assert shown["severity"] == "HIGH"
+        assert shown["risk_score"] == 70
+        assert shown["risk_factors"][0]["adjustment"] == 0
+        assert shown["risk_factors"][0]["certainty"] == "verified"
+    assert detail["evidence"]["items"][-1]["fact"].startswith("Account-wide Block Public Access")
+
+
+def test_a_finding_is_not_flagged_when_the_account_read_is_missing(tmp_path):
+    open_block = {**ALL_ON, "BlockPublicPolicy": False}
+    client = make_client(tmp_path, scan_returning(result([bucket("a", "Enabled", open_block)])))
+    run_scan(client)
+
+    finding = findings_by_rule(client, "CIS-S3-001")[0]
+
+    assert finding["mitigated_by_account_block"] is False
+    assert finding["risk_score"] == 85

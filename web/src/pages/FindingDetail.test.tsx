@@ -530,7 +530,7 @@ describe("Finding detail: Fix tab", () => {
 
     expect(screen.getByText(/To add the rules back/)).toBeInTheDocument();
     expect(
-      screen.getByText("Rescan (POST /api/scans). This finding should resolve."),
+      screen.getByText("Run a scan to verify. This finding should resolve."),
     ).toBeInTheDocument();
   });
 

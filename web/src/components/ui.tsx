@@ -228,6 +228,15 @@ export function FindingFlags({ finding }: { finding: FindingOut }) {
           Tools disagree
         </span>
       )}
+      {finding.mitigated_by_account_block && (
+        <span
+          className={`${CHIP} gap-2 bg-chip-ok-bg text-chip-ok-text`}
+          title="The scan read the account-wide Block Public Access and all four settings are on, so the exposure was not added. The bucket's own setting is still off."
+        >
+          <Icon name="check" size={16} />
+          Mitigated by the account-wide block
+        </span>
+      )}
       {finding.dismissed && (
         <span className={`${CHIP} gap-2 border-2 border-dashed border-dash text-dim`}>
           <Icon name="dismiss" size={16} />

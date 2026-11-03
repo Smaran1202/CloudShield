@@ -10,6 +10,7 @@ import {
 } from "../components/ui";
 import { pretty } from "../format";
 import { shortResource } from "../lanes";
+import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
 
 // There is no endpoint for one resource, so the list is loaded and the right one picked.
@@ -89,7 +90,7 @@ export function ResourceDetail() {
                           to={`/findings/${encodeURIComponent(f.finding_id)}`}
                           className="font-display text-title font-bold underline"
                         >
-                          {f.title}
+                          {maskAccountIds(f.title)}
                         </Link>
                       </li>
                     ))}

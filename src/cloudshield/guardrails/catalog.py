@@ -11,6 +11,8 @@ from cloudshield.fixes.templates import aws_command, patch
 # scope: resource, account or organization
 # reads: the account setting our scan reads to say whether it is active, or None when CloudShield
 # cannot see it.
+# cost: only a figure or a statement taken from an AWS pricing page (or the tool's own licence).
+# None when no cost is known, and then the dashboard shows no cost line.
 
 ACCOUNT_ID_INPUT = "Your 12-digit AWS account id"
 ACCOUNT_ID_PLACEHOLDER = "REPLACE_WITH_YOUR_ACCOUNT_ID"
@@ -236,7 +238,7 @@ def guardrail(
     scope: str,
     patches: list[dict],
     affects: str,
-    cost: str,
+    cost: str | None,
     docs_url: str,
     reads: str | None = None,
 ) -> dict:
@@ -273,7 +275,7 @@ GUARDRAILS = {
             "Applies to every bucket in the account, in all Regions. It does not change "
             "existing policies or ACLs, but a bucket that relies on public access, such as a "
             "static website, stops serving it.",
-            "Check pricing.",
+            None,
             f"{S3_DOCS}/access-control-block-public-access.html",
             reads="s3_public_access_block",
         ),
@@ -288,7 +290,7 @@ GUARDRAILS = {
             "Overrides the account-level settings of the accounts it is attached to. It needs "
             "your organization's management account, and Block Public Access calls made at "
             "account level can then be refused.",
-            "Check pricing.",
+            None,
             f"{ORGANIZATIONS_DOCS}/orgs_manage_policies_s3.html",
         ),
         guardrail(
@@ -388,7 +390,7 @@ GUARDRAILS = {
             "A boundary grants nothing by itself. You must write the boundary policy yourself, "
             "and anything outside it stops working for that role. It cannot be set on a "
             "service-linked role.",
-            "Check pricing.",
+            None,
             f"{IAM_DOCS}/access_policies_boundaries.html",
         ),
         guardrail(

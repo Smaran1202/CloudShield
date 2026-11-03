@@ -30,6 +30,7 @@ import {
   type Lane,
 } from "../lanes";
 import { useRefreshWhenScanEnds } from "../ScanContext";
+import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
 
 // The header and every row use this one definition, so the columns always line up:
@@ -437,7 +438,7 @@ function groupByCheck(rows: FindingOut[]): FindingOut[][] {
 
 function checkTitle(row: FindingOut): string {
   const own = row.details.check_title;
-  return typeof own === "string" && own ? own : row.title;
+  return maskAccountIds(typeof own === "string" && own ? own : row.title);
 }
 
 function GroupRow({ items, index }: { items: FindingOut[]; index: number }) {
@@ -534,7 +535,7 @@ function Row({ row, index }: { row: FindingOut; index: number }) {
           to={`/findings/${encodeURIComponent(row.finding_id)}`}
           className="font-display text-title leading-tight font-bold after:absolute after:inset-0 after:content-['']"
         >
-          {row.title}
+          {maskAccountIds(row.title)}
         </Link>
         <span className="block truncate font-mono text-label" title={row.resource_id}>
           {shortResource(row.resource_id)}

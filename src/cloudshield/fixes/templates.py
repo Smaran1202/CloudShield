@@ -5,7 +5,7 @@ import re
 # refused instead of quoted.
 SAFE_VALUE = re.compile(r"^[A-Za-z0-9._-]+$")
 PLACEHOLDER_KMS_KEY = "REPLACE_WITH_YOUR_KMS_KEY_ARN"
-VERIFY = "Rescan (POST /api/scans). This finding should resolve."
+VERIFY = "Run a scan to verify. This finding should resolve."
 BLOCK_NAMES = ("BlockPublicAcls", "IgnorePublicAcls", "BlockPublicPolicy", "RestrictPublicBuckets")
 
 

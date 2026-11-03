@@ -104,6 +104,7 @@ export function finding(overrides: Partial<FindingOut> = {}): FindingOut {
     disposition_until: null,
     disposition_at: null,
     dismissed: false,
+    mitigated_by_account_block: false,
     suggested_not_applicable: null,
     ...overrides,
   };
@@ -209,7 +210,7 @@ export function fix(overrides: Partial<FixOut> = {}): FixOut {
     pre_checks: ["Find out who connects to the instances today."],
     rollback:
       "To add the rules back, using the same JSON files: aws ec2 authorize-security-group-ingress",
-    verify: "Rescan (POST /api/scans). This finding should resolve.",
+    verify: "Run a scan to verify. This finding should resolve.",
     explanation: {
       why_it_matters: "Anyone on the internet can try to reach this port.",
       what_changes: "The open rule is removed from the group.",

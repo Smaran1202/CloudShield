@@ -52,14 +52,14 @@ four S3 Block Public Access settings for every bucket in the account, in all Reg
 (`aws_s3_account_public_access_block`) and AWS CLI (`aws s3control put-public-access-block`). There
 is no CloudFormation patch, because the CloudFormation S3 resource list has no account-level
 resource. It does not change existing policies or ACLs, and a bucket that needs public access, such
-as a static website, stops serving it. Cost: check pricing. The scan reads this one, which needs
-`s3:GetAccountPublicAccessBlock`.
+as a static website, stops serving it. No cost is shown, because no figure was taken from an AWS
+pricing page. The scan reads this one, which needs `s3:GetAccountPublicAccessBlock`.
 
 **Block public access across the organization** (`s3-organization-block-public-access`). An AWS
 Organizations S3 policy of type `S3_POLICY` with `"@@assign": "all"`. It overrides the account-level
 settings of the accounts it is attached to. It needs the management account, an organization in
 all features mode and the S3 policy type enabled. Terraform is not offered because its resource
-for this policy type was not checked. Cost: check pricing.
+for this policy type was not checked. No cost is shown, for the same reason.
 
 **Reject buckets without versioning** (`pipeline-s3-versioning`) and **Reject open SSH**
 (`pipeline-sg-no-open-ssh`). GitHub Actions workflows that install Checkov and run one check each:
@@ -83,7 +83,7 @@ additional charge.
 write the boundary policy yourself, because a boundary grants nothing and a good one needs real
 usage data. CLI (`aws iam put-role-permissions-boundary`), Terraform (`permissions_boundary`) and
 CloudFormation (`PermissionsBoundary`); the last two are instructions to add one argument to your
-existing role. It cannot be set on a service-linked role. Cost: check pricing.
+existing role. It cannot be set on a service-linked role. No cost is shown, for the same reason.
 
 **AWS Config rules** (`config-s3-bucket-versioning-enabled`, `config-incoming-ssh-disabled`,
 `config-iam-no-admin-access`). Managed rules `S3_BUCKET_VERSIONING_ENABLED`,

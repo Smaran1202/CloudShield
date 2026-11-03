@@ -71,8 +71,11 @@ def check_wildcard_policies(resources: list[dict]) -> list[Hit]:
                     }
                 )
         if flagged:
-            severity = "HIGH" if any(s["action_wildcard"] for s in flagged) else "MEDIUM"
-            hits.append(Hit(policy, {"statements": flagged}, severity=severity))
+            if any(s["action_wildcard"] for s in flagged):
+                severity, title = "HIGH", "IAM policy allows all actions"
+            else:
+                severity, title = "MEDIUM", "IAM policy allows write actions on all resources"
+            hits.append(Hit(policy, {"statements": flagged}, severity=severity, title=title))
     return hits
 
 

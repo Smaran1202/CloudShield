@@ -1,4 +1,6 @@
-from cloudshield.rules.iam import check_wildcard_policies
+from cloudshield.findings import make_finding_id
+from cloudshield.rules import run_rules
+from cloudshield.rules.iam import RULES, check_wildcard_policies
 from cloudshield.scanner.common import make_resource
 
 
@@ -151,3 +153,51 @@ def test_only_the_wildcard_statements_are_listed():
 
     assert [s["statement_index"] for s in hits[0].details["statements"]] == [1]
     assert hits[0].details["statements"][0]["sid"] == "Everything"
+
+
+# the title says which case fired
+
+
+def finding_for(*statements):
+    findings = run_rules([policy(document(*statements))], rules=RULES)
+    assert len(findings) == 1
+    return findings[0]
+
+
+def test_action_star_says_it_allows_all_actions():
+    finding = finding_for(allow("*", "arn:aws:s3:::b"))
+
+    assert finding.title == "IAM policy allows all actions"
+    assert finding.severity == "HIGH"
+
+
+def test_resource_star_with_a_write_action_says_it_allows_write_actions_on_all_resources():
+    finding = finding_for(allow("s3:PutObject", "*"))
+
+    assert finding.title == "IAM policy allows write actions on all resources"
+    assert finding.severity == "MEDIUM"
+
+
+def test_action_star_on_resource_star_is_titled_as_all_actions():
+    assert finding_for(allow("*", "*")).title == "IAM policy allows all actions"
+
+
+def test_a_policy_with_both_cases_is_titled_by_the_more_serious_one():
+    finding = finding_for(allow("s3:PutObject", "*"), allow("*", "arn:aws:s3:::b"))
+
+    assert finding.title == "IAM policy allows all actions"
+    assert len(finding.details["statements"]) == 2
+
+
+def test_the_rule_id_and_the_finding_id_do_not_depend_on_the_title():
+    arn = "arn:aws:iam::123456789012:policy/p"
+
+    all_actions = finding_for(allow("*", "arn:aws:s3:::b"))
+    writes = finding_for(allow("s3:PutObject", "*"))
+
+    assert all_actions.rule_id == writes.rule_id == "CIS-IAM-001"
+    assert all_actions.finding_id == writes.finding_id == make_finding_id("CIS-IAM-001", arn)
+
+
+def test_the_rule_itself_keeps_its_general_title():
+    assert RULES[0].title == "IAM policy allows all actions or all resources"

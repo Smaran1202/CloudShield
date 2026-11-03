@@ -1,3 +1,4 @@
+import { maskAccountIds } from "../mask";
 import { parseRich, type Inline } from "../richText";
 
 function Parts({ parts }: { parts: Inline[] }) {
@@ -43,7 +44,7 @@ function Parts({ parts }: { parts: Inline[] }) {
 export function RichText({ text }: { text: string }) {
   return (
     <div className="space-y-2 text-secondary break-words">
-      {parseRich(text).map((block, index) =>
+      {parseRich(maskAccountIds(text)).map((block, index) =>
         block.kind === "paragraph" ? (
           <p key={index}>
             <Parts parts={block.parts} />

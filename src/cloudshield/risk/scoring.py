@@ -2,6 +2,7 @@ from dataclasses import replace
 
 from cloudshield.findings import Finding
 from cloudshield.rules import ALL_RULES
+from cloudshield.rules.evidence import item
 from cloudshield.rules.s3 import BLOCK_SETTINGS
 from cloudshield.rules.security_groups import open_sources
 
@@ -10,13 +11,36 @@ EXPOSURE_BONUS = 15
 ATTACHED_BONUS = 10
 PRIVILEGE_BONUS = 10
 COUNTS_TOWARD_RISK = {rule.id: rule.counts_toward_risk for rule in ALL_RULES}
+ACCOUNT_BLOCK_REASON = (
+    "Account-wide Block Public Access is on (read by the scan), so this bucket cannot be made "
+    "public by an ACL or policy"
+)
+ACCOUNT_BLOCK_FACT = (
+    "Account-wide Block Public Access is on, but this bucket's own setting is still off"
+)
 
 
 def factor(name: str, adjustment: int, reason: str, certainty: str) -> dict:
     return {"factor": name, "adjustment": adjustment, "reason": reason, "certainty": certainty}
 
 
-def exposure_factor(resource: dict) -> dict | None:
+def account_block_on(account_settings: dict) -> dict | None:
+    """The account-wide Block Public Access settings, when the scan read them and all four are
+    on. A failed, denied or missing read, or a setting that is off, gives None."""
+    block = account_settings.get("s3_public_access_block")
+    if block and all(block.get(name) is True for name in BLOCK_SETTINGS):
+        return block
+    return None
+
+
+def is_mitigated(risk_factors: list[dict]) -> bool:
+    """True when the exposure was left out because the account-wide block is on."""
+    return any(
+        f["factor"] == "exposure" and f["reason"] == ACCOUNT_BLOCK_REASON for f in risk_factors
+    )
+
+
+def exposure_factor(resource: dict, account_block: dict | None = None) -> dict | None:
     """+15 when the resource is configured to be reachable from the internet."""
     attributes = resource["attributes"]
     if resource["resource_type"] == "S3":
@@ -25,6 +49,8 @@ def exposure_factor(resource: dict) -> dict | None:
             return factor("exposure", 0, reason, "unknown")
         block = attributes["public_access_block"]
         off = [n for n in BLOCK_SETTINGS if block is None or not block.get(n)]
+        if off and account_block is not None:
+            return factor("exposure", 0, ACCOUNT_BLOCK_REASON, "verified")
         if off:
             reason = f"Block Public Access is incomplete (off or missing: {', '.join(off)})."
             return factor("exposure", EXPOSURE_BONUS, reason, "verified")
@@ -85,9 +111,11 @@ def privilege_factor(resource: dict) -> dict | None:
     return factor("privilege", PRIVILEGE_BONUS, reason, "verified")
 
 
-def context_factors(resource: dict, instances: list[dict], ec2_known: bool) -> list[dict]:
+def context_factors(
+    resource: dict, instances: list[dict], ec2_known: bool, account_block: dict | None = None
+) -> list[dict]:
     factors = [
-        exposure_factor(resource),
+        exposure_factor(resource, account_block),
         attached_factor(resource, instances, ec2_known),
         privilege_factor(resource),
     ]
@@ -115,6 +143,7 @@ def score_findings(findings: list[Finding], result: dict, regions: list[str]) ->
     resources = {r["resource_id"]: r for r in result["resources"]}
     instances = [r for r in result["resources"] if r["resource_type"] == "EC2"]
     ec2_has_errors = any(error["service"] == "ec2" for error in result["errors"])
+    account_block = account_block_on(result.get("account_settings", {}))
 
     scored = []
     for finding in findings:
@@ -123,7 +152,26 @@ def score_findings(findings: list[Finding], result: dict, regions: list[str]) ->
             continue
         resource = resources[finding.resource_id]
         ec2_known = not ec2_has_errors and resource["region"] in regions
-        factors = context_factors(resource, instances, ec2_known)
+        factors = context_factors(resource, instances, ec2_known, account_block)
         score = BASE_SCORES[finding.severity] + sum(f["adjustment"] for f in factors)
-        scored.append(replace(finding, risk_score=min(100, score), risk_factors=factors))
+        evidence = finding.evidence
+        if is_mitigated(factors):
+            added = account_block_item(resource, account_block)
+            evidence = {**evidence, "items": [*evidence["items"], added]}
+        scored.append(
+            replace(finding, risk_score=min(100, score), risk_factors=factors, evidence=evidence)
+        )
     return scored
+
+
+def account_block_item(resource: dict, account_block: dict) -> dict:
+    """Evidence: the account-wide setting that was read, and the bucket's own settings that are
+    still off."""
+    own = resource["attributes"]["public_access_block"]
+    off = [name for name in BLOCK_SETTINGS if own is None or not own.get(name)]
+    value = {
+        "account_wide": {name: account_block[name] for name in BLOCK_SETTINGS},
+        "bucket_settings_off": off,
+    }
+    source = "account_settings.s3_public_access_block, attributes.public_access_block"
+    return item(ACCOUNT_BLOCK_FACT, value, source)

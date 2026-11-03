@@ -10,11 +10,16 @@ from cloudshield.db.models import (
 )
 from cloudshield.imports.mapping import SAME_CHECK, SOURCE, Pair, rule_id_of
 from cloudshield.imports.recheck import SERVICE_OF
+from cloudshield.risk.scoring import is_mitigated
 
 PASSED_REASON = "passed in a newer import"
 ALSO_REPORTED = "Also reported by an imported scan"
 NOT_COMPARED = "CloudShield could not read this setting, so the two results are not compared."
 RATES_PREFIX = "The imported scan rates this "
+ACCOUNT_BLOCK_NOTE = (
+    "The account-wide block is on, which the imported check may count, and it may look at only "
+    "two of the four settings (unverified: see Prowler's check page)."
+)
 
 
 def latest_completed_scan(session: Session, account_id: str) -> ScanRow | None:
@@ -27,7 +32,7 @@ def latest_completed_scan(session: Session, account_id: str) -> ScanRow | None:
 
 
 def without_corroboration(evidence: dict) -> dict:
-    ours = (ALSO_REPORTED, NOT_COMPARED)
+    ours = (ALSO_REPORTED, NOT_COMPARED, ACCOUNT_BLOCK_NOTE)
     items = [
         i
         for i in evidence.get("items", [])
@@ -166,6 +171,15 @@ def reconcile(session: Session, account_id: str, scan: ScanRow | None = None) ->
             elif theirs == "PASS" and ours_open:
                 ours.tools_disagree = True
                 ours.corroborated_by = [*ours.corroborated_by, entry]
+                if pair.rule == "CIS-S3-001" and is_mitigated(ours.risk_factors):
+                    # The imported check may count the account-wide block, which ours does not.
+                    note = {
+                        "fact": ACCOUNT_BLOCK_NOTE,
+                        "value": {"check_id": check_id},
+                        "source": SOURCE,
+                        "certainty": "unknown",
+                    }
+                    ours.evidence = with_item(ours.evidence, note)
             elif theirs == "FAIL" and session.get(ResourceRow, (account_id, resource_id)):
                 # Our scan holds this resource and has no open finding for it.
                 imported.tools_disagree = True

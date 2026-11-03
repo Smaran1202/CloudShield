@@ -154,6 +154,9 @@ class FindingOut(BaseModel):
     disposition_until: UtcDateTime | None
     disposition_at: UtcDateTime | None
     dismissed: bool = False
+    # The S3 exposure was left out because the scan read the account-wide Block Public Access
+    # and all four settings are on. The finding stays open and keeps its severity.
+    mitigated_by_account_block: bool = False
     # A suggestion only. Nothing is ever dismissed automatically.
     suggested_not_applicable: SuggestedNotApplicable | None = None
 
@@ -283,7 +286,8 @@ class GuardrailOut(BaseModel):
     scope: GuardrailScope
     patches: list[PatchOut]
     affects: str
-    cost: str
+    # None when no cost is known. Then the dashboard shows no cost line.
+    cost: str | None
     docs_url: str
     status: GuardrailStatus
     status_reason: str

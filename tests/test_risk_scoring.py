@@ -1,5 +1,12 @@
+import pytest
+
 from cloudshield.findings import Finding
-from cloudshield.risk.scoring import BASE_SCORES, score_findings
+from cloudshield.risk.scoring import (
+    ACCOUNT_BLOCK_FACT,
+    BASE_SCORES,
+    is_mitigated,
+    score_findings,
+)
 from cloudshield.rules import run_rules
 from cloudshield.scanner.common import make_resource
 
@@ -281,3 +288,112 @@ def test_unknown_factors_never_add_risk():
             for item in finding.risk_factors:
                 if item["certainty"] == "unknown":
                     assert item["adjustment"] == 0
+
+
+# the account-wide Block Public Access
+
+
+def scored_with_account(resources, account_settings, regions=(REGION, "us-east-1")):
+    result = {"resources": resources, "errors": [], "account_settings": account_settings}
+    return score_findings(run_rules(resources), result, list(regions))
+
+
+OPEN_BLOCK = {**ALL_ON, "BlockPublicPolicy": False}
+ACCOUNT_ON = {"s3_public_access_block": ALL_ON}
+
+
+def test_an_account_wide_block_that_is_on_removes_the_bucket_exposure_but_keeps_the_finding():
+    findings = scored_with_account([bucket(public_access_block=OPEN_BLOCK)], ACCOUNT_ON)
+
+    finding = one(findings, "CIS-S3-001")
+    assert finding.status == "OPEN"
+    assert finding.severity == "HIGH"
+    assert finding.risk_score == 70
+    assert factor(finding, "exposure") == {
+        "factor": "exposure",
+        "adjustment": 0,
+        "reason": (
+            "Account-wide Block Public Access is on (read by the scan), so this bucket cannot "
+            "be made public by an ACL or policy"
+        ),
+        "certainty": "verified",
+    }
+    assert is_mitigated(finding.risk_factors) is True
+
+
+def test_the_mitigation_adds_an_evidence_item_with_both_settings():
+    block = {**ALL_ON, "BlockPublicPolicy": False, "IgnorePublicAcls": False}
+
+    resources = [bucket(public_access_block=block)]
+
+    finding = one(scored_with_account(resources, ACCOUNT_ON), "CIS-S3-001")
+
+    last = finding.evidence["items"][-1]
+    assert last["fact"] == ACCOUNT_BLOCK_FACT
+    assert last["certainty"] == "verified"
+    assert last["value"]["account_wide"] == ALL_ON
+    assert last["value"]["bucket_settings_off"] == ["IgnorePublicAcls", "BlockPublicPolicy"]
+    assert "account_settings.s3_public_access_block" in last["source"]
+    assert len(finding.evidence["items"]) == 5
+
+
+def test_a_bucket_with_no_block_at_all_is_mitigated_and_says_all_four_are_off():
+    finding = one(scored_with_account([bucket(public_access_block=None)], ACCOUNT_ON), "CIS-S3-001")
+
+    assert finding.risk_score == 70
+    assert finding.evidence["items"][-1]["value"]["bucket_settings_off"] == list(ALL_ON)
+
+
+def test_the_other_findings_on_the_bucket_are_mitigated_too():
+    resources = [bucket(public_access_block=OPEN_BLOCK, versioning="Disabled")]
+
+    finding = one(scored_with_account(resources, ACCOUNT_ON), "CIS-S3-003")
+
+    assert finding.risk_score == 40
+    assert is_mitigated(finding.risk_factors) is True
+
+
+def test_a_bucket_whose_own_block_is_fully_on_is_not_called_mitigated():
+    resources = [bucket(public_access_block=ALL_ON, versioning="Disabled")]
+
+    finding = one(scored_with_account(resources, ACCOUNT_ON), "CIS-S3-003")
+
+    assert factor(finding, "exposure")["reason"] == "Block Public Access is fully enabled."
+    assert is_mitigated(finding.risk_factors) is False
+    assert finding.evidence["items"][-1]["fact"] != ACCOUNT_BLOCK_FACT
+
+
+@pytest.mark.parametrize(
+    "account_settings",
+    [
+        {},  # the account read failed, was denied, or was not made
+        {"s3_public_access_block": None},  # read, and nothing is configured
+        {"s3_public_access_block": {**ALL_ON, "RestrictPublicBuckets": False}},
+        {"s3_public_access_block": {**ALL_ON, "BlockPublicAcls": None}},
+        {"s3_public_access_block": {"BlockPublicAcls": True}},
+    ],
+)
+def test_without_a_fully_on_account_block_the_exposure_is_added_as_before(account_settings):
+    finding = one(
+        scored_with_account([bucket(public_access_block=OPEN_BLOCK)], account_settings),
+        "CIS-S3-001",
+    )
+
+    assert finding.risk_score == 85
+    assert factor(finding, "exposure")["adjustment"] == 15
+    assert is_mitigated(finding.risk_factors) is False
+    assert all(i["fact"] != ACCOUNT_BLOCK_FACT for i in finding.evidence["items"])
+
+
+def test_a_result_with_no_account_settings_key_behaves_as_before():
+    finding = one(scored([bucket(public_access_block=OPEN_BLOCK)]), "CIS-S3-001")
+
+    assert finding.risk_score == 85
+
+
+def test_the_account_block_does_not_change_a_security_group():
+    resources = [group(OPEN_SSH)]
+
+    finding = one(scored_with_account(resources, ACCOUNT_ON), "CIS-SG-001")
+
+    assert factor(finding, "exposure")["adjustment"] == 15

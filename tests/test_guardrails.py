@@ -57,9 +57,26 @@ def test_every_guardrail_has_valid_fields_and_an_aws_docs_link(guardrail):
     assert guardrail["scope"] in SCOPES
     assert urlparse(guardrail["docs_url"]).hostname == "docs.aws.amazon.com"
     assert guardrail["docs_url"].startswith("https://")
-    for name in ("title", "prevents", "affects", "cost"):
+    for name in ("title", "prevents", "affects"):
         assert guardrail[name].strip()
     assert guardrail["patches"]
+
+
+@pytest.mark.parametrize("guardrail", GUARDRAILS.values(), ids=list(GUARDRAILS))
+def test_a_cost_is_either_absent_or_says_something(guardrail):
+    cost = guardrail["cost"]
+
+    assert cost is None or (cost.strip() and cost.strip() != "Check pricing.")
+
+
+def test_a_guardrail_with_no_known_cost_has_none_not_a_filler_line():
+    no_cost = {id for id, g in GUARDRAILS.items() if g["cost"] is None}
+
+    assert no_cost == {
+        "s3-account-block-public-access",
+        "s3-organization-block-public-access",
+        "iam-permissions-boundary",
+    }
 
 
 @pytest.mark.parametrize("guardrail", GUARDRAILS.values(), ids=list(GUARDRAILS))
