@@ -168,6 +168,9 @@ describe("Import a results file: steps 2 and 3, the file and the result", () => 
     expect(
       await within(dialog).findByText("Imported 2, 1 passed, 3 resolved"),
     ).toBeInTheDocument();
+    expect(within(dialog).getByTestId("import-result")).toHaveTextContent(
+      /^Imported 2, 1 passed, 3 resolved$/,
+    );
     const [call] = callsTo("POST", "/api/imports/prowler");
     expect(call.bodyIsFile).toBe(true);
     expect(call.headers["content-type"]).toBe("application/json");
@@ -210,6 +213,7 @@ describe("Import a results file: steps 2 and 3, the file and the result", () => 
     await user.upload(fileInput(), resultsFile());
 
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(message);
+    expect(within(dialog).getByTestId("import-result")).toHaveTextContent(message);
     expect(within(dialog).getByRole("button", { name: "Close" })).toBeEnabled();
   });
 

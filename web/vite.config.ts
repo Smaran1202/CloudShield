@@ -8,8 +8,8 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    // The browser tests in e2e/ are run by Playwright (npm run e2e), not by vitest.
-    exclude: [...configDefaults.exclude, "e2e/**"],
+    // The browser tests in e2e/ and e2e-actions/ are run by Playwright, not by vitest.
+    exclude: [...configDefaults.exclude, "e2e/**", "e2e-actions/**"],
     // Style files are empty in tests, except when a test reads one as text.
     css: { include: [/\.css\?raw$/] },
   },

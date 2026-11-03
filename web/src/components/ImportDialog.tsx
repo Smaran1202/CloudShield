@@ -198,7 +198,11 @@ export function ImportDialog({
           <h3 id={`${titleId}-3`} className="text-label font-semibold">
             Step 3. Result
           </h3>
-          <div className="mt-2 min-h-8 text-secondary" aria-live="polite">
+          <div
+            data-testid="import-result"
+            className="mt-2 min-h-8 text-secondary"
+            aria-live="polite"
+          >
             {upload.phase === "idle" && (
               <p className="text-dim">Nothing has been imported yet.</p>
             )}

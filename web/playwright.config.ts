@@ -1,27 +1,8 @@
-import { existsSync } from "node:fs";
 import { defineConfig } from "@playwright/test";
+import { installedBrowser } from "./browser";
 
 const WEB = "http://localhost:5173";
 const API = "http://127.0.0.1:8000";
-
-// No browser is downloaded. The tests use the Chrome that is installed, or Edge.
-function installedBrowser(): "chrome" | "msedge" {
-  const local = process.env.LOCALAPPDATA ?? "";
-  const chrome = [
-    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
-    `${local}\\Google\\Chrome\\Application\\chrome.exe`,
-  ];
-  const edge = [
-    "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-    "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  ];
-  if (chrome.some(existsSync)) return "chrome";
-  if (edge.some(existsSync)) return "msedge";
-  throw new Error(
-    "Neither Google Chrome nor Microsoft Edge was found. Install one of them: the browser tests do not download a browser.",
-  );
-}
 
 const python =
   process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
