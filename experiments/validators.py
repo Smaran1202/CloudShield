@@ -3,12 +3,12 @@
 Each check returns an empty string when the patch is valid, or the first problem it found.
 """
 
-import importlib.util
 import json
 import os
 import shlex
+import shutil
 import subprocess
-import sys
+import sysconfig
 import tempfile
 from pathlib import Path
 
@@ -21,6 +21,7 @@ from botocore.model import ServiceModel, Shape
 # The AWS CLI names two services differently from botocore.
 CLI_SERVICE_NAMES = {"s3api": "s3", "configservice": "config"}
 LOADER = Loader()
+CFN_LINT_EXIT_CODES = (0, 2, 4, 6, 8, 10, 12, 14)
 TERRAFORM_HEADER = """terraform {
   required_providers {
     aws = {
@@ -160,47 +161,78 @@ def check_json(shape: Shape, data, where: str) -> str:
     return f"{where} has the type {kind}, which this check does not cover"
 
 
+def cfn_lint_command() -> str | None:
+    """The cfn-lint command that pip installs. cfn-lint 1.59.0 has no __main__ module, so
+    `python -m cfnlint` does not work; its only entry point is this console script. It is in the
+    folder where this interpreter keeps its scripts, which is not always on the PATH."""
+    return shutil.which("cfn-lint", path=sysconfig.get_path("scripts")) or shutil.which("cfn-lint")
+
+
 def cfn_lint_installed() -> bool:
-    return importlib.util.find_spec("cfnlint") is not None
+    return cfn_lint_command() is not None
 
 
 def check_cloudformation(content: str) -> str:
-    # cfn-lint exits with 0 for nothing found, 1 when it could not run, and adds 2 for an error,
-    # 4 for a warning and 8 for an informational message. Only an error makes the patch invalid.
+    """Runs `cfn-lint --format json template.yaml`. Its documented exit codes are 0 for nothing
+    found, and the sum of 2 (an error), 4 (a warning) and 8 (an informational message) for what it
+    found. Anything else, such as 1 for a bad configuration, means it could not run. Only an error
+    makes the patch invalid."""
+    command = cfn_lint_command()
+    if command is None:
+        raise RuntimeError('cfn-lint is not installed: pip install -e ".[experiments]"')
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "template.yaml"
         path.write_text(content, encoding="utf-8")
-        command = [sys.executable, "-m", "cfnlint", "--format", "json", str(path)]
-        done = subprocess.run(command, capture_output=True, text=True, timeout=120)
-    if done.returncode == 1:
-        raise RuntimeError(f"cfn-lint could not run: {done.stderr.strip()}")
-    if not done.returncode & 2:
+        arguments = [command, "--format", "json", str(path)]
+        done = subprocess.run(arguments, capture_output=True, text=True, timeout=120)
+    code = done.returncode
+    if code not in CFN_LINT_EXIT_CODES:
+        # cfn-lint prints its own failure messages to stdout.
+        raise RuntimeError(f"cfn-lint could not run (exit {code}): {done.stdout} {done.stderr}")
+    if not code & 2:
         return ""
-    messages = [m for m in json.loads(done.stdout) if m.get("Level") == "Error"]
-    if not messages:
-        return "cfn-lint reported an error"
-    return f"{messages[0].get('Rule', {}).get('Id', '')} {messages[0].get('Message', '')}"
+    try:
+        matches = json.loads(done.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"cfn-lint printed output that is not JSON: {done.stdout}") from exc
+    errors = [match for match in matches if match["Level"] == "Error"]
+    if not errors:
+        raise RuntimeError(f"cfn-lint exit {code} but its output has no error: {done.stdout}")
+    return f"{errors[0]['Rule']['Id']} {errors[0]['Message']}"
 
 
-def run_terraform(arguments: list[str], folder: str, env: dict) -> subprocess.CompletedProcess:
+def run_terraform(arguments: list[str], folder: Path) -> subprocess.CompletedProcess:
     command = ["terraform", *arguments]
+    env = {**os.environ, "TF_IN_AUTOMATION": "1"}
     return subprocess.run(command, cwd=folder, env=env, capture_output=True, text=True)
 
 
-def check_terraform(content: str, plugin_cache: Path) -> str:
-    """terraform init downloads the AWS provider, so this needs the network. The plugin cache
-    makes it happen once for all the patches."""
-    env = {**os.environ, "TF_PLUGIN_CACHE_DIR": str(plugin_cache), "TF_IN_AUTOMATION": "1"}
-    with tempfile.TemporaryDirectory() as folder:
-        (Path(folder) / "main.tf").write_text(TERRAFORM_HEADER + content, encoding="utf-8")
-        done = run_terraform(["init", "-backend=false", "-input=false", "-no-color"], folder, env)
-        if done.returncode != 0:
-            raise RuntimeError(f"terraform init failed: {done.stdout} {done.stderr}")
-        done = run_terraform(["validate", "-json", "-no-color"], folder, env)
-    report = json.loads(done.stdout)
+def prepare_terraform(folder: Path) -> None:
+    """Writes the provider block and runs terraform init, once. It downloads the AWS provider, so
+    it needs the network. validate then reuses the installed provider for every patch, because
+    only main.tf changes between patches."""
+    (folder / "main.tf").write_text(TERRAFORM_HEADER, encoding="utf-8")
+    done = run_terraform(["init", "-backend=false", "-input=false", "-no-color"], folder)
+    if done.returncode != 0:
+        raise RuntimeError(f"terraform init failed (exit {done.returncode}): {done.stdout}")
+
+
+def check_terraform(content: str, folder: Path) -> str:
+    """Runs `terraform validate -json` in a folder that prepare_terraform has set up. The JSON
+    report has `valid` and a list of `diagnostics` with a `severity` of error or warning, a
+    `summary` and a `detail`. A warning does not make the configuration invalid."""
+    (folder / "main.tf").write_text(TERRAFORM_HEADER + content, encoding="utf-8")
+    done = run_terraform(["validate", "-json", "-no-color"], folder)
+    try:
+        report = json.loads(done.stdout)
+    except json.JSONDecodeError as exc:
+        message = f"terraform validate printed output that is not JSON (exit {done.returncode})"
+        raise RuntimeError(f"{message}: {done.stdout} {done.stderr}") from exc
     if report["valid"]:
         return ""
     errors = [d for d in report["diagnostics"] if d["severity"] == "error"]
+    if not errors:
+        raise RuntimeError(f"terraform validate said invalid with no error: {done.stdout}")
     return f"{errors[0]['summary']}: {errors[0].get('detail', '')}"
 
 
@@ -235,9 +267,9 @@ def verdict(error: str) -> tuple[str, str]:
     return ("no", clean) if clean else ("yes", "")
 
 
-def validate(patch: dict, plugin_cache: Path | None = None) -> tuple[str, str, str]:
-    """Returns (validator, valid, error). valid is yes, no or skipped. plugin_cache is set only
-    when terraform should be run."""
+def validate(patch: dict, terraform_dir: Path | None = None) -> tuple[str, str, str]:
+    """Returns (validator, valid, error). valid is yes, no or skipped. terraform_dir is set only
+    when terraform should be run (see prepare_terraform)."""
     kind = patch["format"]
     if patch["instructions_only"]:
         return "none", "skipped", "instructions only, there is no code to check"
@@ -250,7 +282,7 @@ def validate(patch: dict, plugin_cache: Path | None = None) -> tuple[str, str, s
             return "cfn-lint", "skipped", 'not installed: pip install -e ".[experiments]"'
         return ("cfn-lint", *verdict(check_cloudformation(patch["content"])))
     if kind == "terraform":
-        if plugin_cache is None:
+        if terraform_dir is None:
             return "terraform validate", "skipped", "not run here; the CI job runs it"
-        return ("terraform validate", *verdict(check_terraform(patch["content"], plugin_cache)))
+        return ("terraform validate", *verdict(check_terraform(patch["content"], terraform_dir)))
     raise ValueError(f"No check exists for the patch format {kind}")

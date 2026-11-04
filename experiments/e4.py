@@ -15,7 +15,7 @@ from cloudshield.guardrails.catalog import BY_RULE, GUARDRAILS
 from cloudshield.rules import run_rules
 from experiments.common import RESULTS, format_table, summarise, write_csv
 from experiments.e4_fixtures import FIXTURES
-from experiments.validators import validate
+from experiments.validators import prepare_terraform, validate
 
 COLUMNS = ["rule", "fixture", "source", "format", "patch", "validator", "valid", "error"]
 SUMMARY_COLUMNS = ["source", "format", "validator", "cases", "yes", "no", "skipped"]
@@ -26,8 +26,8 @@ SUMMARY_FLAGS = {
 }
 
 
-def make_row(rule: str, fixture: str, source: str, patch: dict, plugin_cache) -> dict:
-    validator, valid, error = validate(patch, plugin_cache)
+def make_row(rule: str, fixture: str, source: str, patch: dict, terraform_dir) -> dict:
+    validator, valid, error = validate(patch, terraform_dir)
     return {
         "rule": rule,
         "fixture": fixture,
@@ -40,17 +40,17 @@ def make_row(rule: str, fixture: str, source: str, patch: dict, plugin_cache) ->
     }
 
 
-def fix_rows(plugin_cache) -> list[dict]:
+def fix_rows(terraform_dir) -> list[dict]:
     rows = []
     for name, resource in FIXTURES:
         for finding in run_rules([resource]):
             fix = build_fix({"rule_id": finding.rule_id, "details": finding.details}, resource)
             for patch in fix["patches"]:
-                rows.append(make_row(finding.rule_id, name, "fix", patch, plugin_cache))
+                rows.append(make_row(finding.rule_id, name, "fix", patch, terraform_dir))
     return rows
 
 
-def guardrail_rows(plugin_cache) -> list[dict]:
+def guardrail_rows(terraform_dir) -> list[dict]:
     rules_of: dict[str, list[str]] = {}
     for rule_id, guardrail_ids in BY_RULE.items():
         for guardrail_id in guardrail_ids:
@@ -59,16 +59,18 @@ def guardrail_rows(plugin_cache) -> list[dict]:
     for guardrail_id, guardrail in GUARDRAILS.items():
         rule = "+".join(rules_of[guardrail_id])
         for patch in guardrail["patches"]:
-            rows.append(make_row(rule, guardrail_id, "guardrail", patch, plugin_cache))
+            rows.append(make_row(rule, guardrail_id, "guardrail", patch, terraform_dir))
     return rows
 
 
 def run(out_dir: Path = RESULTS, terraform: bool = False) -> list[dict]:
     if terraform and shutil.which("terraform") is None:
         raise RuntimeError("--terraform was given, but terraform is not on the PATH.")
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as cache:
-        plugin_cache = Path(cache) if terraform else None
-        rows = fix_rows(plugin_cache) + guardrail_rows(plugin_cache)
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+        terraform_dir = Path(folder) if terraform else None
+        if terraform_dir:
+            prepare_terraform(terraform_dir)
+        rows = fix_rows(terraform_dir) + guardrail_rows(terraform_dir)
     write_csv(out_dir / "e4.csv", COLUMNS, rows)
     write_csv(out_dir / "e4_summary.csv", SUMMARY_COLUMNS, summary(rows))
     return rows

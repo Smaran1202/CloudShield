@@ -1,11 +1,11 @@
 source,format,validator,cases,yes,no,skipped
 fix,cli,botocore,23,23,0,0
-fix,cloudformation,cfn-lint,10,0,0,10
+fix,cloudformation,cfn-lint,10,10,0,0
 fix,cloudformation,none,8,0,0,8
 fix,terraform,none,8,0,0,8
 fix,terraform,terraform validate,15,0,0,15
 guardrail,cli,botocore,6,6,0,0
-guardrail,cloudformation,cfn-lint,3,0,0,3
+guardrail,cloudformation,cfn-lint,3,3,0,0
 guardrail,cloudformation,none,1,0,0,1
 guardrail,github_actions,yaml structure,3,3,0,0
 guardrail,terraform,none,1,0,0,1

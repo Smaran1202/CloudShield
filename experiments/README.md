@@ -30,10 +30,14 @@ E1 takes about 40 seconds. The output is the same on every run.
 Two validators for E4 need extra tools. Without them their rows are `skipped`, not `yes`:
 
 - CloudFormation is checked with cfn-lint (licence MIT-0, which allows this use). Install it with
-  `pip install -e ".[experiments]"`.
+  `pip install -e ".[experiments]"`. It is run as the `cfn-lint` command that pip installs
+  (`cfn-lint --format json template.yaml`); version 1.59.0 has no `python -m cfnlint`. Exit code 0
+  is clean, 2 is an error, 4 a warning and 8 an informational message (added together); only an
+  error makes a patch invalid, and any other exit code stops the run with an error.
 - Terraform is checked with `terraform validate`. It is only run when you add `--terraform`
   (`python -m experiments.run_all --terraform`), needs `terraform` on the PATH and the network
-  (`terraform init` downloads the AWS provider). It may be blocked on some machines, so the CI job
+  (`terraform init` runs once and downloads the AWS provider; `terraform validate -json` then runs
+  for each patch). It may be blocked on some machines, so the CI job
   `experiments-e4` in `.github/workflows/ci.yml` runs it and uploads `e4.csv` as the artifact
   `e4-results`. Use that file for the Terraform and CloudFormation numbers in the paper.
 

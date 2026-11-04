@@ -1,43 +1,43 @@
 rule,fixture,source,format,patch,validator,valid,error
 CIS-S3-001,bucket-no-settings,fix,terraform,Block all public access (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-001,bucket-no-settings,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-001,bucket-no-settings,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,yes,
 CIS-S3-001,bucket-no-settings,fix,cli,Block all public access (AWS CLI),botocore,yes,
 CIS-S3-002,bucket-no-settings,fix,terraform,Use a KMS key for default encryption (Terraform),terraform validate,skipped,not run here; the CI job runs it
 CIS-S3-002,bucket-no-settings,fix,cli,Use a KMS key for default encryption (AWS CLI),botocore,yes,
 CIS-S3-003,bucket-no-settings,fix,terraform,Enable versioning (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,bucket-no-settings,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,bucket-no-settings,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,yes,
 CIS-S3-003,bucket-no-settings,fix,cli,Enable versioning (AWS CLI),botocore,yes,
 CIS-S3-001,bucket-partial-block,fix,terraform,Block all public access (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-001,bucket-partial-block,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-001,bucket-partial-block,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,yes,
 CIS-S3-001,bucket-partial-block,fix,cli,Block all public access (AWS CLI),botocore,yes,
 CIS-S3-002,bucket-partial-block,fix,terraform,Use a KMS key for default encryption (Terraform),terraform validate,skipped,not run here; the CI job runs it
 CIS-S3-002,bucket-partial-block,fix,cli,Use a KMS key for default encryption (AWS CLI),botocore,yes,
 CIS-S3-003,bucket-partial-block,fix,terraform,Enable versioning (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,bucket-partial-block,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,bucket-partial-block,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,yes,
 CIS-S3-003,bucket-partial-block,fix,cli,Enable versioning (AWS CLI),botocore,yes,
 CIS-S3-001,bucket-dotted-name,fix,terraform,Block all public access (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-001,bucket-dotted-name,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-001,bucket-dotted-name,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,yes,
 CIS-S3-001,bucket-dotted-name,fix,cli,Block all public access (AWS CLI),botocore,yes,
 CIS-S3-002,bucket-dotted-name,fix,terraform,Use a KMS key for default encryption (Terraform),terraform validate,skipped,not run here; the CI job runs it
 CIS-S3-002,bucket-dotted-name,fix,cli,Use a KMS key for default encryption (AWS CLI),botocore,yes,
 CIS-S3-003,bucket-dotted-name,fix,terraform,Enable versioning (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,bucket-dotted-name,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,bucket-dotted-name,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,yes,
 CIS-S3-003,bucket-dotted-name,fix,cli,Enable versioning (AWS CLI),botocore,yes,
 CIS-S3-001,bucket-numeric-start,fix,terraform,Block all public access (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-001,bucket-numeric-start,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-001,bucket-numeric-start,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,yes,
 CIS-S3-001,bucket-numeric-start,fix,cli,Block all public access (AWS CLI),botocore,yes,
 CIS-S3-002,bucket-numeric-start,fix,terraform,Use a KMS key for default encryption (Terraform),terraform validate,skipped,not run here; the CI job runs it
 CIS-S3-002,bucket-numeric-start,fix,cli,Use a KMS key for default encryption (AWS CLI),botocore,yes,
 CIS-S3-003,bucket-numeric-start,fix,terraform,Enable versioning (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,bucket-numeric-start,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,bucket-numeric-start,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,yes,
 CIS-S3-003,bucket-numeric-start,fix,cli,Enable versioning (AWS CLI),botocore,yes,
 CIS-S3-001,bucket-longest-name,fix,terraform,Block all public access (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-001,bucket-longest-name,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-001,bucket-longest-name,fix,cloudformation,Block all public access (CloudFormation),cfn-lint,yes,
 CIS-S3-001,bucket-longest-name,fix,cli,Block all public access (AWS CLI),botocore,yes,
 CIS-S3-002,bucket-longest-name,fix,terraform,Use a KMS key for default encryption (Terraform),terraform validate,skipped,not run here; the CI job runs it
 CIS-S3-002,bucket-longest-name,fix,cli,Use a KMS key for default encryption (AWS CLI),botocore,yes,
 CIS-S3-003,bucket-longest-name,fix,terraform,Enable versioning (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,bucket-longest-name,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,bucket-longest-name,fix,cloudformation,Enable versioning (CloudFormation),cfn-lint,yes,
 CIS-S3-003,bucket-longest-name,fix,cli,Enable versioning (AWS CLI),botocore,yes,
 CIS-SG-001,sg-ssh-ipv4,fix,terraform,Remove the open ingress rules (Terraform),none,skipped,"instructions only, there is no code to check"
 CIS-SG-001,sg-ssh-ipv4,fix,cloudformation,Remove the open ingress rules (CloudFormation),none,skipped,"instructions only, there is no code to check"
@@ -68,16 +68,16 @@ CIS-S3-001,s3-account-block-public-access,guardrail,cli,Block public access for 
 CIS-S3-001,s3-organization-block-public-access,guardrail,cli,Block public access across the organization (AWS CLI),botocore,yes,
 CIS-S3-003,pipeline-s3-versioning,guardrail,github_actions,Check bucket versioning with Checkov (GitHub Actions),yaml structure,yes,
 CIS-S3-003,config-s3-bucket-versioning-enabled,guardrail,terraform,Add the AWS Config rule (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-S3-003,config-s3-bucket-versioning-enabled,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-S3-003,config-s3-bucket-versioning-enabled,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,yes,
 CIS-S3-003,config-s3-bucket-versioning-enabled,guardrail,cli,Add the AWS Config rule (AWS CLI),botocore,yes,
 CIS-SG-001,pipeline-sg-no-open-ssh,guardrail,github_actions,Check for open SSH with Checkov (GitHub Actions),yaml structure,yes,
 CIS-SG-001,config-incoming-ssh-disabled,guardrail,terraform,Add the AWS Config rule (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-SG-001,config-incoming-ssh-disabled,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-SG-001,config-incoming-ssh-disabled,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,yes,
 CIS-SG-001,config-incoming-ssh-disabled,guardrail,cli,Add the AWS Config rule (AWS CLI),botocore,yes,
 CIS-IAM-001+SX-IAM-PRIVESC-001,pipeline-iam-validate-policy,guardrail,github_actions,Validate policy files with IAM Access Analyzer (GitHub Actions),yaml structure,yes,
 CIS-IAM-001+SX-IAM-PRIVESC-001,iam-permissions-boundary,guardrail,terraform,Set a permissions boundary (Terraform),none,skipped,"instructions only, there is no code to check"
 CIS-IAM-001+SX-IAM-PRIVESC-001,iam-permissions-boundary,guardrail,cloudformation,Set a permissions boundary (CloudFormation),none,skipped,"instructions only, there is no code to check"
 CIS-IAM-001+SX-IAM-PRIVESC-001,iam-permissions-boundary,guardrail,cli,Set a permissions boundary (AWS CLI),botocore,yes,
 CIS-IAM-001,config-iam-no-admin-access,guardrail,terraform,Add the AWS Config rule (Terraform),terraform validate,skipped,not run here; the CI job runs it
-CIS-IAM-001,config-iam-no-admin-access,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,skipped,"not installed: pip install -e "".[experiments]"""
+CIS-IAM-001,config-iam-no-admin-access,guardrail,cloudformation,Add the AWS Config rule (CloudFormation),cfn-lint,yes,
 CIS-IAM-001,config-iam-no-admin-access,guardrail,cli,Add the AWS Config rule (AWS CLI),botocore,yes,
