@@ -120,7 +120,7 @@ test("c. the fix of a CIS-S3-001 finding has patches, what was not checked and g
   await page.goto(`${findingPath(finding!)}?tab=fix`);
   await page.getByRole("button", { name: "Generate fix" }).click();
 
-  await expect(page.getByRole("heading", { name: "Why it matters" })).toBeVisible({
+  await expect(page.getByRole("region", { name: "Patches", exact: true })).toBeVisible({
     timeout: 2 * 60_000,
   });
   const fix = await getJson<FixOut>(
@@ -132,6 +132,8 @@ test("c. the fix of a CIS-S3-001 finding has patches, what was not checked and g
   await expect(patches).toBeVisible();
   await expect(patches.getByRole("tab")).toHaveCount(fix.patches.length);
   expect(fix.not_checked.length).toBeGreaterThan(0);
+  // The first view is short. What was not checked is in full under More detail.
+  await page.getByRole("button", { name: /^More detail/ }).click();
   await expect(
     page.getByRole("heading", { name: "CloudShield did not check" }),
   ).toBeVisible();
@@ -142,6 +144,11 @@ test("c. the fix of a CIS-S3-001 finding has patches, what was not checked and g
   await expect(
     page.getByRole("region", { name: "Prevent it coming back" }),
   ).toBeVisible();
+  // The guardrails CloudShield cannot read are together in one fold.
+  const cannotCheck = page.getByRole("button", {
+    name: /guardrails? CloudShield cannot check/,
+  });
+  if ((await cannotCheck.count()) > 0) await cannotCheck.click();
   for (const guardrail of fix.guardrails) {
     await expect(
       page.getByRole("article", { name: guardrail.title, exact: true }),

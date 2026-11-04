@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import type { FindingOut } from "../src/api";
+import { LANE_THRESHOLDS } from "../src/lanes";
 import {
   expect,
   getJson,
@@ -9,6 +10,10 @@ import {
   test,
   trailingNumber,
 } from "./fixtures";
+
+// The default list: open findings with a score of Next or higher.
+const inFocus = (f: FindingOut) =>
+  isActive(f) && f.risk_score !== null && f.risk_score >= LANE_THRESHOLDS.next;
 
 test.beforeEach(async ({ request }) => {
   const findings = await getJson<FindingOut[]>(request, "/api/findings");
@@ -25,10 +30,14 @@ test.describe("Findings list", () => {
     const chips = page.getByRole("group", { name: "Lane" }).getByRole("button");
     await expect(chips.first()).toBeVisible();
     const total = await chips.count();
-    expect(total).toBe(7);
+    expect(total).toBe(8);
 
-    const open = findings.filter(isActive).length;
-    expect(trailingNumber(await chips.first().innerText()), "Open chip").toBe(open);
+    expect(trailingNumber(await chips.nth(0).innerText()), "Fix now and Next chip").toBe(
+      findings.filter(inFocus).length,
+    );
+    expect(trailingNumber(await chips.nth(1).innerText()), "Open chip").toBe(
+      findings.filter(isActive).length,
+    );
 
     for (let index = 0; index < total; index++) {
       const chip = chips.nth(index);
@@ -50,7 +59,7 @@ test.describe("Findings list", () => {
     const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
     const severities = [...new Set(open.map((f) => f.severity))];
     test.skip(severities.length === 0, "No finding is open.");
-    await page.goto("/findings");
+    await page.goto("/findings?lane=open");
 
     for (const severity of severities) {
       const expected = open.filter((f) => f.severity === severity).length;
@@ -67,7 +76,7 @@ test.describe("Findings list", () => {
     request,
   }) => {
     const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
-    await page.goto("/findings");
+    await page.goto("/findings?lane=open");
 
     for (const source of ["cloudshield", "prowler"]) {
       const expected = open.filter((f) => f.source === source).length;
@@ -85,7 +94,7 @@ test.describe("Findings list", () => {
   }) => {
     const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
     const info = open.filter((f) => f.severity === "INFO").length;
-    await page.goto("/findings");
+    await page.goto("/findings?lane=open");
 
     await select(page, "Informational").selectOption("hide");
     await showing(page, open.length - info);
@@ -94,14 +103,41 @@ test.describe("Findings list", () => {
     await showing(page, info);
   });
 
-  test("Clear filters brings back the whole open list", async ({ page, request }) => {
-    const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
-    await page.goto("/findings?severity=CRITICAL&source=cloudshield");
+  test("Clear filters brings back the default list", async ({ page, request }) => {
+    const focus = (await getJson<FindingOut[]>(request, "/api/findings")).filter(inFocus);
+    await page.goto("/findings?lane=open&severity=CRITICAL&source=cloudshield");
 
     await page.getByRole("button", { name: "Clear filters" }).click();
 
-    await showing(page, open.length);
+    await showing(page, focus.length);
     await expect(page.getByRole("button", { name: "Clear filters" })).toHaveCount(0);
+  });
+
+  test("the default list is Fix now and Next, with Later grouped by check and informational behind a count", async ({
+    page,
+    request,
+  }) => {
+    const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
+    const later = open.filter(
+      (f) => f.risk_score !== null && f.risk_score < LANE_THRESHOLDS.next,
+    );
+    const info = open.filter((f) => f.severity === "INFO");
+
+    await page.goto("/findings");
+
+    const focus = open.filter(inFocus).length;
+    await showing(page, focus);
+    await expect(listedRows(page)).toHaveCount(focus);
+    const grouped = page.getByRole("table", { name: "Later, grouped by check" });
+    if (later.length > 0) {
+      const checks = new Set(later.map((f) => f.rule_id)).size;
+      await expect(grouped.getByRole("row")).toHaveCount(checks);
+    } else {
+      await expect(grouped).toHaveCount(0);
+    }
+    const link = page.getByRole("link", { name: /^\d+ informational findings?$/ });
+    if (info.length > 0) await expect(link).toContainText(String(info.length));
+    else await expect(link).toHaveCount(0);
   });
 
   test("Group by check can be switched on and off", async ({ page }) => {
