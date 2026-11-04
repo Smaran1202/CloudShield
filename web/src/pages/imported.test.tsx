@@ -72,7 +72,7 @@ describe("Findings: imported findings", () => {
   const routes = { "GET /api/findings": [own, imported, stale] };
 
   it("shows an Imported badge on imported rows and none on our own", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
 
     const rows = (await screen.findAllByRole("row")).slice(1);
     const ours = rows.find((r) =>
@@ -85,7 +85,7 @@ describe("Findings: imported findings", () => {
   });
 
   it("filters by source from a select and keeps it in the URL", async () => {
-    const user = renderApp("/findings", routes);
+    const user = renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     await user.selectOptions(screen.getByLabelText("Source"), "prowler");
@@ -101,7 +101,7 @@ describe("Findings: imported findings", () => {
   });
 
   it("names the source filter options CloudShield and Imported", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     const options = within(screen.getByLabelText("Source")).getAllByRole("option");
@@ -115,14 +115,14 @@ describe("Findings: imported findings", () => {
   });
 
   it("opens with the source filter set when the URL asks for it", async () => {
-    renderApp("/findings?source=prowler", routes);
+    renderApp("/findings?lane=open&source=prowler", routes);
 
     expect(await screen.findByText(/Showing 2 of 3 findings/)).toBeInTheDocument();
     expect(screen.getByLabelText("Source")).toHaveValue("prowler");
   });
 
   it("labels a finding the newest import did not mention, with the import date", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
 
     const label = await screen.findByText(/Not rechecked/);
 
@@ -132,7 +132,7 @@ describe("Findings: imported findings", () => {
 
   it("keeps a long imported rule id on one line with the full id in a tooltip", async () => {
     const check = "iam_password_policy_expires_passwords_within_90_days_or_less";
-    renderApp("/findings", {
+    renderApp("/findings?lane=open", {
       "GET /api/findings": [finding({ ...IMPORTED, rule_id: `PRW-${check}` })],
     });
 
@@ -191,15 +191,16 @@ describe("Overview: lanes show at most five tiles", () => {
       "href",
       "/findings?lane=next",
     );
-    expect(
-      within(later).getByRole("link", { name: /6 findings across 1 check/ }),
-    ).toHaveAttribute("href", "/findings?lane=later");
-    expect(
-      within(later).queryByRole("link", { name: /See all/ }),
-    ).not.toBeInTheDocument();
+    // Later has no tiles. It is one collapsed row for the check, and a link to all of them.
+    expect(within(later).getAllByRole("button")).toHaveLength(1);
+    expect(within(later).queryAllByRole("heading", { level: 3 })).toHaveLength(0);
+    expect(within(later).getByRole("link", { name: /See all 6/ })).toHaveAttribute(
+      "href",
+      "/findings?lane=later",
+    );
   });
 
-  it("counts the distinct checks in the Later link", async () => {
+  it("has one collapsed row for each check in Later, with its number of resources", async () => {
     const mixed = [
       ...many(4, 50),
       ...many(2, 40).map((f) => ({ ...f, rule_id: "CIS-S3-003" })),
@@ -207,10 +208,14 @@ describe("Overview: lanes show at most five tiles", () => {
     renderApp("/", routes(mixed));
 
     const later = await screen.findByRole("region", { name: "Later" });
+    const rows = within(later).getAllByRole("button");
 
-    expect(
-      within(later).getByRole("link", { name: /6 findings across 2 checks/ }),
-    ).toBeInTheDocument();
+    expect(rows.map((r) => r.textContent)).toEqual([
+      "Finding 50-0, 4 resources",
+      "Finding 40-0, 2 resources",
+    ]);
+    expect(rows[0]).toHaveAttribute("aria-expanded", "false");
+    expect(within(later).getByRole("link", { name: /See all 6/ })).toBeInTheDocument();
   });
 
   it("counts the open findings by source", async () => {
@@ -222,9 +227,9 @@ describe("Overview: lanes show at most five tiles", () => {
   });
 
   it("shows the check id without the PRW- prefix on an imported tile", async () => {
-    renderApp("/", routes([imported]));
+    renderApp("/", routes([{ ...imported, risk_score: 70 }]));
 
-    const lane = await screen.findByRole("region", { name: "Later" });
+    const lane = await screen.findByRole("region", { name: "Next" });
     const tile = within(lane).getByRole("link", { name: "Password policy is weak" });
 
     expect(
@@ -233,9 +238,9 @@ describe("Overview: lanes show at most five tiles", () => {
   });
 
   it("puts the Imported badge on an imported tile", async () => {
-    renderApp("/", routes([own, imported]));
+    renderApp("/", routes([own, { ...imported, risk_score: 70 }]));
 
-    const lane = await screen.findByRole("region", { name: "Later" });
+    const lane = await screen.findByRole("region", { name: "Next" });
     const tile = within(lane).getByRole("link", { name: "Password policy is weak" });
 
     expect(

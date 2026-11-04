@@ -116,7 +116,7 @@ describe("Overview: the hero", () => {
     ).toEqual([
       "/findings?lane=next",
       "/findings?lane=later",
-      "/findings?info=only",
+      "/findings?lane=open&info=only",
       "/findings?lane=dismissed",
     ]);
   });
@@ -250,17 +250,22 @@ describe("certaintySummary", () => {
 
 describe("Overview: the lanes", () => {
   it("places open findings in the lanes by score, highest first", async () => {
-    renderApp("/", results);
+    const user = renderApp("/", results);
 
     await screen.findByRole("region", { name: "Fix now" });
     const now = within(lane("Fix now")).getAllByRole("link");
     const next = within(lane("Next")).getAllByRole("link");
-    const later = within(lane("Later")).getAllByRole("link");
     expect(now.map((l) => l.getAttribute("href"))).toEqual([
       "/findings/F-A",
       "/findings/F-B",
     ]);
     expect(next.map((l) => l.getAttribute("href"))).toEqual(["/findings/F-C"]);
+    // Later is one collapsed row for the check. Its findings are in it, once it is opened.
+    expect(
+      within(lane("Later")).queryByRole("link", { name: "No versioning" }),
+    ).not.toBeInTheDocument();
+    await user.click(within(lane("Later")).getByRole("button"));
+    const later = within(lane("Later")).getAllByRole("link");
     expect(later.map((l) => l.getAttribute("href"))).toContain("/findings/F-D");
   });
 
@@ -314,7 +319,7 @@ describe("Overview: the lanes", () => {
     ).toBeNull();
     expect(within(lane("Later")).getByRole("link", { name: "See them" })).toHaveAttribute(
       "href",
-      "/findings?info=only",
+      "/findings?lane=open&info=only",
     );
   });
 

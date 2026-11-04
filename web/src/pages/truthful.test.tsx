@@ -100,12 +100,12 @@ describe("Overview: headline and counts", () => {
     expect(hrefs(lanes)).toEqual([
       "/findings?lane=next",
       "/findings?lane=later",
-      "/findings?info=only",
+      "/findings?lane=open&info=only",
       "/findings?lane=dismissed",
     ]);
     expect(hrefs(sources)).toEqual([
-      "/findings?source=cloudshield&info=hide",
-      "/findings?source=prowler&info=hide",
+      "/findings?lane=open&source=cloudshield&info=hide",
+      "/findings?lane=open&source=prowler&info=hide",
     ]);
   });
 
@@ -114,10 +114,10 @@ describe("Overview: headline and counts", () => {
     for (const [path, shown] of [
       ["/findings?lane=next", "Showing 1 of 9"],
       ["/findings?lane=later", "Showing 2 of 9"],
-      ["/findings?info=only", "Showing 1 of 9"],
+      ["/findings?lane=open&info=only", "Showing 1 of 9"],
       ["/findings?lane=dismissed", "Showing 1 of 9"],
-      ["/findings?source=cloudshield&info=hide", "Showing 4 of 9"],
-      ["/findings?source=prowler&info=hide", "Showing 1 of 9"],
+      ["/findings?lane=open&source=cloudshield&info=hide", "Showing 4 of 9"],
+      ["/findings?lane=open&source=prowler&info=hide", "Showing 1 of 9"],
     ]) {
       const { unmount } = renderApp(path, all) as unknown as { unmount?: () => void };
       expect(await screen.findByText(new RegExp(shown))).toBeInTheDocument();
@@ -208,7 +208,7 @@ describe("Findings: chips for merged and disputed findings", () => {
   const routes = { "GET /api/findings": [confirmed, oursOpen, theirsOpen] };
 
   it("shows Confirmed by 2 tools when another scan reports the same failure", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     expect(
@@ -218,7 +218,7 @@ describe("Findings: chips for merged and disputed findings", () => {
   });
 
   it("shows Tools disagree with both results when ours is open and the import passes", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     const ours = row("Ours is open");
@@ -230,7 +230,7 @@ describe("Findings: chips for merged and disputed findings", () => {
   });
 
   it("shows both results when the import fails and ours has no open finding", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     expect(
@@ -538,7 +538,7 @@ describe("Findings: dismissed filter", () => {
   const routes = { "GET /api/findings": [own, gone] };
 
   it("keeps dismissed findings out of the default list and the Open count", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
 
     await screen.findByRole("table");
 
@@ -548,7 +548,7 @@ describe("Findings: dismissed filter", () => {
   });
 
   it("lists them under Dismissed with a chip and the reason", async () => {
-    const user = renderApp("/findings", routes);
+    const user = renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: /^Dismissed/ }));
@@ -592,7 +592,7 @@ describe("Findings: table grid and grouping", () => {
   };
 
   it("puts every header cell in the grid, so the rule ids sit under the Rule header", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
 
     const header = await screen.findByTestId("findings-header");
     const cells = within(header).getAllByRole("columnheader");
@@ -610,7 +610,7 @@ describe("Findings: table grid and grouping", () => {
   });
 
   it("is not grouped until the toggle is pressed", async () => {
-    renderApp("/findings", routes);
+    renderApp("/findings?lane=open", routes);
 
     await screen.findByRole("table");
 
@@ -622,7 +622,7 @@ describe("Findings: table grid and grouping", () => {
   });
 
   it("collapses a repeated check into one row with a count, and expands to its resources", async () => {
-    const user = renderApp("/findings", routes);
+    const user = renderApp("/findings?lane=open", routes);
     await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: "Group by check" }));
@@ -644,14 +644,14 @@ describe("Findings: table grid and grouping", () => {
   });
 
   it("opens already grouped from the link", async () => {
-    renderApp("/findings?group=check", routes);
+    renderApp("/findings?lane=open&group=check", routes);
 
     expect(await screen.findByText("2 resources")).toBeInTheDocument();
   });
 
   it("keeps a long rule id on one line with the full value in a title", async () => {
     const long = "iam_password_policy_expires_passwords_within_90_days_or_less";
-    renderApp("/findings", {
+    renderApp("/findings?lane=open", {
       "GET /api/findings": [finding({ rule_id: `PRW-${long}` })],
     });
 

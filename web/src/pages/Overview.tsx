@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   api,
@@ -25,6 +25,7 @@ import {
 import { formatDate, formatRelative, plural, ruleLabel, scanDuration } from "../format";
 import {
   byScoreDescending,
+  checkTitle,
   countLanes,
   inLane as membersOf,
   isActive,
@@ -201,7 +202,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
             parts={[
               [counts.next, "next", "/findings?lane=next"],
               [counts.later, "later", "/findings?lane=later"],
-              [informational.length, "informational", "/findings?info=only"],
+              [informational.length, "informational", "/findings?lane=open&info=only"],
               [dismissed, "dismissed", "/findings?lane=dismissed"],
             ]}
           />
@@ -213,9 +214,9 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
                 [
                   foundHere,
                   "found by CloudShield",
-                  "/findings?source=cloudshield&info=hide",
+                  "/findings?lane=open&source=cloudshield&info=hide",
                 ],
-                [imported, "imported", "/findings?source=prowler&info=hide"],
+                [imported, "imported", "/findings?lane=open&source=prowler&info=hide"],
               ]}
             />
           )}
@@ -270,15 +271,20 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
           count={counts.later}
           delay={750}
           extra={
-            more("later") || noScore.length > 0 ? (
+            inLane("later").length > 0 || noScore.length > 0 ? (
               <>
-                {more("later") && <LaterSummary rows={inLane("later")} />}
+                {inLane("later").length > 0 && (
+                  <SeeAll lane="later" total={counts.later} />
+                )}
                 {noScore.length > 0 && (
                   <li className="rounded-chip border-2 border-dashed border-dash p-4 text-secondary">
                     {noScore.length === 1
                       ? "1 informational finding with no risk score."
                       : `${noScore.length} informational findings with no risk score.`}{" "}
-                    <Link to="/findings?info=only" className="font-semibold underline">
+                    <Link
+                      to="/findings?lane=open&info=only"
+                      className="font-semibold underline"
+                    >
                       See them
                     </Link>
                   </li>
@@ -287,12 +293,10 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
             ) : undefined
           }
         >
-          {inLane("later")
-            .slice(0, TILES_PER_LANE)
-            .map((f, i) => (
-              <Tile key={f.finding_id} finding={f} lane="later" index={i} />
-            ))}
-        </LaneColumn>
+          {laterGroups(inLane("later")).map((group) => (
+            <LaterGroup key={group[0].rule_id} rows={group} />
+          ))}
+        </LaneColumn>{" "}
       </div>
 
       <DoneStrip resolved={resolved} />
@@ -335,18 +339,62 @@ function CountLine({
   );
 }
 
-// Later holds the low scores, so it says how many findings and how many checks, not a bare count.
-function LaterSummary({ rows }: { rows: FindingOut[] }) {
-  const checks = new Set(rows.map((r) => r.rule_id)).size;
+// Later holds the low scores, so it is one collapsed row for each check, not a tile for each finding.
+function laterGroups(rows: FindingOut[]): FindingOut[][] {
+  const groups = new Map<string, FindingOut[]>();
+  for (const row of rows)
+    groups.set(row.rule_id, [...(groups.get(row.rule_id) ?? []), row]);
+  return [...groups.values()];
+}
+
+function LaterGroup({ rows }: { rows: FindingOut[] }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const first = rows[0];
   return (
-    <li>
-      <Link
-        to="/findings?lane=later"
-        className="inline-flex min-h-11 items-center gap-2 font-semibold underline"
+    <li className="rounded-chip border-2 border-ink bg-paper p-4 text-ink">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+        className="flex min-h-11 w-full items-center gap-2 text-left font-semibold"
       >
-        {rows.length} findings across {plural(checks, "check", "checks")}{" "}
-        <Icon name="arrow" size={18} />
-      </Link>
+        <Icon name="chevron" size={18} className={open ? "rotate-180" : ""} />
+        <span className="min-w-0 flex-1">
+          {maskAccountIds(checkTitle(first))}
+          <span className="sr-only">,</span>{" "}
+          <span className="font-normal text-dim">
+            {plural(rows.length, "resource", "resources")}
+          </span>
+        </span>
+      </button>
+      <ul id={id} hidden={!open} className="mt-2 space-y-3">
+        {rows.map((f) => (
+          <li key={f.finding_id}>
+            <Link
+              to={`/findings/${encodeURIComponent(f.finding_id)}`}
+              className="font-semibold underline"
+            >
+              {maskAccountIds(f.title)}
+            </Link>
+            <span
+              className="block truncate font-mono text-label text-dim"
+              title={f.resource_id}
+            >
+              {shortResource(f.resource_id)}, risk {f.risk_score}
+            </span>
+          </li>
+        ))}
+        <li>
+          <Link
+            to={`/findings?lane=later&rule=${encodeURIComponent(first.rule_id)}`}
+            className="font-semibold underline"
+          >
+            Open these {rows.length} in Findings
+          </Link>
+        </li>
+      </ul>
     </li>
   );
 }

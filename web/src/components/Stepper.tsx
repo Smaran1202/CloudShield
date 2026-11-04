@@ -7,6 +7,14 @@ const STEPS = [
   "Rescan to verify",
 ];
 
+// Only the step you are on is opened with its hint. The others stay as one line.
+const HINTS = [
+  "Read what was found and how sure CloudShield is.",
+  "Go through what to check before you change anything.",
+  "Apply the patch to your account yourself.",
+  "Run a scan to see that the problem is gone.",
+];
+
 // The state of each step comes from what has really happened, not from a timer.
 export function stepStates(events: {
   fixShown: boolean;
@@ -49,6 +57,9 @@ export function Stepper({ states }: { states: StepState[] }) {
           >
             {step}
           </span>
+          {states[index] === "current" && (
+            <span className="mt-1 block text-secondary text-dim">{HINTS[index]}</span>
+          )}
           <span className="sr-only">{LABEL[states[index]]}</span>
         </li>
       ))}

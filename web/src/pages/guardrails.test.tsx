@@ -66,9 +66,23 @@ function card(title: string): HTMLElement {
   return screen.getByRole("article", { name: title });
 }
 
+type User = Awaited<ReturnType<typeof openFix>>;
+
+// A row is one line. Its details and patches open with its button.
+async function expand(user: User, title: string) {
+  await user.click(within(card(title)).getByRole("button", { name: new RegExp(title) }));
+}
+
+// The guardrails CloudShield cannot read are in one fold.
+async function openCannotCheck(user: User) {
+  await user.click(
+    screen.getByRole("button", { name: /guardrails? CloudShield cannot check/ }),
+  );
+}
+
 describe("Fix tab: Prevent it coming back", () => {
   it("shows the section under the fix with the promise that nothing is changed", async () => {
-    await openFix();
+    const user = await openFix();
 
     const section = screen.getByRole("region", { name: "Prevent it coming back" });
 
@@ -78,11 +92,78 @@ describe("Fix tab: Prevent it coming back", () => {
     expect(section).toHaveTextContent(
       "Apply the fix first, then a guardrail stops it returning. CloudShield never changes your account.",
     );
+    // One guardrail CloudShield can read is a row. The two it cannot read are in one fold.
+    expect(within(section).getAllByRole("article")).toHaveLength(1);
+    await openCannotCheck(user);
     expect(within(section).getAllByRole("article")).toHaveLength(3);
   });
 
-  it("shows title, kind, scope, effects, cost and an AWS link on each card", async () => {
+  it("groups the guardrails CloudShield cannot check under one fold with their count", async () => {
     await openFix();
+
+    const fold = screen.getByRole("button", {
+      name: "2 guardrails CloudShield cannot check",
+    });
+
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("article", { name: account.title })).toBeVisible();
+    expect(screen.queryByRole("article", { name: org.title })).not.toBeInTheDocument();
+  });
+
+  it("says guardrail, not guardrails, for one", async () => {
+    await openFix([account, pipeline]);
+
+    expect(
+      screen.getByRole("button", { name: "1 guardrail CloudShield cannot check" }),
+    ).toBeInTheDocument();
+  });
+
+  it("has no fold when every guardrail can be read", async () => {
+    await openFix([
+      account,
+      guardrail({ id: "g2", title: "Another one", status: "not_active" }),
+    ]);
+
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(
+      screen.queryByRole("button", { name: /cannot check/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows one compact row for each guardrail: title, status chip and kind, and no details", async () => {
+    await openFix();
+
+    const row = card(account.title);
+
+    expect(
+      within(row).getByRole("button", { name: new RegExp(account.title) }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(row.querySelector('[data-status="active"]')).not.toBeNull();
+    expect(row).toHaveTextContent("Account setting");
+    expect(within(row).queryByText("What this affects")).not.toBeVisible();
+    expect(within(row).queryByRole("link", { name: "AWS documentation" })).toBeNull();
+  });
+
+  it("opens a row and a fold with the keyboard", async () => {
+    const user = await openFix();
+    const fold = screen.getByRole("button", { name: /cannot check/ });
+
+    fold.focus();
+    await user.keyboard("{Enter}");
+    expect(fold).toHaveAttribute("aria-expanded", "true");
+    const row = within(card(org.title)).getByRole("button", {
+      name: new RegExp(org.title),
+    });
+    row.focus();
+    await user.keyboard(" ");
+
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(within(card(org.title)).getByText("What this affects")).toBeVisible();
+  });
+
+  it("shows title, kind, scope, effects, cost and an AWS link once a row is opened", async () => {
+    const user = await openFix();
+    await expand(user, "Block public access for the whole account");
 
     const shown = card("Block public access for the whole account");
 
@@ -98,7 +179,8 @@ describe("Fix tab: Prevent it coming back", () => {
   });
 
   it("shows each status as an icon and a label", async () => {
-    await openFix();
+    const user = await openFix();
+    await openCannotCheck(user);
 
     const chips = [
       [card(account.title), "active", "Active"],
@@ -123,6 +205,7 @@ describe("Fix tab: Prevent it coming back", () => {
 
   it("shows the patches with tabs and a Copy button for each guardrail", async () => {
     const user = await openFix();
+    await expand(user, account.title);
     const panel = within(card(account.title)).getByRole("region", {
       name: `Patches for ${account.title}`,
     });
@@ -144,7 +227,8 @@ describe("Fix tab: Prevent it coming back", () => {
   });
 
   it("shows a pipeline file and its extra files as copyable text", async () => {
-    await openFix();
+    const user = await openFix();
+    await openCannotCheck(user);
 
     const shown = card(pipeline.title);
     const orgCard = card(org.title);

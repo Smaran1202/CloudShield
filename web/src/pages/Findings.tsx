@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, SEVERITIES, type FindingOut } from "../api";
+import { BulkDismissDialog } from "../components/BulkDismissDialog";
 import { Icon } from "../components/Icon";
 import {
   AsyncView,
   EmptyState,
   FIELD,
   PageTitle,
+  SectionTitle,
+  SECONDARY_BUTTON,
   FindingFlags,
   FindingNotes,
   NotRechecked,
@@ -18,11 +21,13 @@ import {
 import { formatDate, formatRelative, plural, ruleLabel, ruleOptions } from "../format";
 import {
   byScoreDescending,
+  checkTitle,
   countLanes,
   inLane,
   isActive,
   isDismissed,
   LANE_DOT,
+  LANE_THRESHOLDS,
   LANE_NAME,
   LANES,
   laneOf,
@@ -41,7 +46,8 @@ export const FINDINGS_GRID =
 export interface Filters {
   q: string;
   severity: string;
-  lane: Lane | "open" | "dismissed" | "all";
+  // focus: Fix now and Next, the default. open: every open finding.
+  lane: Lane | "focus" | "open" | "dismissed" | "all";
   info: "" | "hide" | "only";
   group: boolean;
   rule: string;
@@ -58,9 +64,9 @@ function readFilters(params: URLSearchParams): Filters {
     severity: params.get("severity") ?? "",
     lane: LANES.includes(lane as Lane)
       ? (lane as Lane)
-      : lane === "all" || lane === "dismissed"
+      : lane === "all" || lane === "dismissed" || lane === "open"
         ? lane
-        : "open",
+        : "focus",
     info:
       params.get("info") === "hide" || params.get("info") === "only"
         ? (params.get("info") as "hide" | "only")
@@ -78,6 +84,8 @@ function readFilters(params: URLSearchParams): Filters {
 function inChosenLane(row: FindingOut, lane: Filters["lane"]): boolean {
   if (lane === "all") return true;
   if (lane === "open") return isActive(row);
+  if (lane === "focus")
+    return inLane([row], "now").length + inLane([row], "next").length === 1;
   if (lane === "dismissed") return isDismissed(row);
   return inLane([row], lane).length === 1;
 }
@@ -137,6 +145,7 @@ export function Findings() {
   useRefreshWhenScanEnds(reload);
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   function change(name: string, value: string) {
     const next = new URLSearchParams(params);
@@ -174,6 +183,8 @@ export function Findings() {
         const open = rows.filter(isActive).length;
         const dismissed = rows.filter((r) => inChosenLane(r, "dismissed")).length;
         const visible = applyFilters(rows, filters);
+        const suggested = rows.filter((r) => isActive(r) && r.suggested_not_applicable);
+        const focused = filters.lane === "focus";
         const types = [...new Set(rows.map((r) => r.resource_type))].sort();
         return (
           <>
@@ -185,10 +196,16 @@ export function Findings() {
 
             <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Lane">
               <LaneChip
+                label="Fix now and Next"
+                count={counts.now + counts.next}
+                pressed={filters.lane === "focus"}
+                onClick={() => change("lane", "")}
+              />
+              <LaneChip
                 label="Open"
                 count={open}
                 pressed={filters.lane === "open"}
-                onClick={() => change("lane", "")}
+                onClick={() => change("lane", "open")}
               />
               {LANES.map((lane) => (
                 <LaneChip
@@ -274,6 +291,15 @@ export function Findings() {
               />
             </div>
 
+            {suggested.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setBulkOpen(true)}
+                className={`mr-3 mb-4 ${SECONDARY_BUTTON}`}
+              >
+                Dismiss all AWS-managed ({suggested.length})
+              </button>
+            )}
             <button
               type="button"
               aria-pressed={filters.group}
@@ -298,14 +324,87 @@ export function Findings() {
               )}
             </p>
             {visible.length === 0 ? (
-              <EmptyState title="No findings match these filters" />
+              <EmptyState
+                title={
+                  focused
+                    ? "Nothing is in Fix now or Next"
+                    : "No findings match these filters"
+                }
+              />
             ) : (
               <FindingsTable rows={visible} filters={filters} onSort={sortBy} />
+            )}
+            {focused && filters.info === "" && (
+              <LaterAndInformational rows={rows} filters={filters} onSort={sortBy} />
+            )}
+            {bulkOpen && (
+              <BulkDismissDialog
+                findings={suggested}
+                onClose={(changed) => {
+                  setBulkOpen(false);
+                  if (changed) reload();
+                }}
+              />
             )}
           </>
         );
       }}
     </AsyncView>
+  );
+}
+
+// What the default view keeps out of the main list, with its count: Later, grouped by check with
+// one collapsed row for each, and the informational findings behind a count link.
+function LaterAndInformational({
+  rows,
+  filters,
+  onSort,
+}: {
+  rows: FindingOut[];
+  filters: Filters;
+  onSort: (sort: Filters["sort"]) => void;
+}) {
+  const grouped = { ...filters, group: true };
+  const later = applyFilters(rows, { ...grouped, lane: "later" });
+  const informational = applyFilters(rows, { ...filters, lane: "open", info: "only" });
+  if (later.length === 0 && informational.length === 0) return null;
+  const checks = new Set(later.map((row) => row.rule_id)).size;
+  return (
+    <div className="mt-12 space-y-8">
+      {later.length > 0 && (
+        <section aria-label="Later">
+          <SectionTitle>Later</SectionTitle>
+          <p className="mt-1 mb-4 text-secondary text-dim">
+            {plural(later.length, "finding", "findings")} across{" "}
+            {plural(checks, "check", "checks")}, scored below {LANE_THRESHOLDS.next}. Open
+            a row to see its findings, or{" "}
+            <Link to="?lane=later" className="font-semibold text-ink underline">
+              show them as one list
+            </Link>
+            .
+          </p>
+          <FindingsTable
+            rows={later}
+            filters={grouped}
+            onSort={onSort}
+            label="Later, grouped by check"
+            header={false}
+          />
+        </section>
+      )}
+      {informational.length > 0 && (
+        <p className="text-secondary">
+          <Link to="?lane=open&info=only" className="font-semibold text-ink underline">
+            {plural(
+              informational.length,
+              "informational finding",
+              "informational findings",
+            )}
+          </Link>
+          . They have no risk score.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -381,37 +480,43 @@ function FindingsTable({
   rows,
   filters,
   onSort,
+  label = "Findings",
+  header = true,
 }: {
   rows: FindingOut[];
   filters: Filters;
   onSort: (sort: Filters["sort"]) => void;
+  label?: string;
+  header?: boolean;
 }) {
   return (
     <div className="max-h-[75vh] overflow-auto rounded-lane border-2 border-ink bg-white">
-      <div role="table" aria-label="Findings" className="min-w-[900px]">
-        <div
-          role="row"
-          data-testid="findings-header"
-          className={`${FINDINGS_GRID} sticky top-0 z-10 border-b border-ink bg-white px-4`}
-        >
-          <span role="columnheader">
-            <span className="sr-only">Lane</span>
-          </span>
-          <SortHeader label="Risk" sort="risk" filters={filters} onSort={onSort} />
-          <span role="columnheader" className="text-label font-semibold">
-            Finding
-          </span>
-          <span role="columnheader" className="text-label font-semibold">
-            Rule
-          </span>
-          <span role="columnheader" className="text-label font-semibold">
-            Status
-          </span>
-          <SortHeader label="Last seen" sort="seen" filters={filters} onSort={onSort} />
-          <span role="columnheader">
-            <span className="sr-only">Open</span>
-          </span>
-        </div>
+      <div role="table" aria-label={label} className="min-w-[900px]">
+        {header && (
+          <div
+            role="row"
+            data-testid="findings-header"
+            className={`${FINDINGS_GRID} sticky top-0 z-10 border-b border-ink bg-white px-4`}
+          >
+            <span role="columnheader">
+              <span className="sr-only">Lane</span>
+            </span>
+            <SortHeader label="Risk" sort="risk" filters={filters} onSort={onSort} />
+            <span role="columnheader" className="text-label font-semibold">
+              Finding
+            </span>
+            <span role="columnheader" className="text-label font-semibold">
+              Rule
+            </span>
+            <span role="columnheader" className="text-label font-semibold">
+              Status
+            </span>
+            <SortHeader label="Last seen" sort="seen" filters={filters} onSort={onSort} />
+            <span role="columnheader">
+              <span className="sr-only">Open</span>
+            </span>
+          </div>
+        )}
         {filters.group
           ? groupByCheck(rows).map((items, index) =>
               items.length === 1 ? (
@@ -434,11 +539,6 @@ function groupByCheck(rows: FindingOut[]): FindingOut[][] {
   for (const row of rows)
     groups.set(row.rule_id, [...(groups.get(row.rule_id) ?? []), row]);
   return [...groups.values()];
-}
-
-function checkTitle(row: FindingOut): string {
-  const own = row.details.check_title;
-  return maskAccountIds(typeof own === "string" && own ? own : row.title);
 }
 
 function GroupRow({ items, index }: { items: FindingOut[]; index: number }) {
@@ -471,9 +571,10 @@ function GroupRow({ items, index }: { items: FindingOut[]; index: number }) {
         </span>
         <span role="cell" className="min-w-0">
           <span className="block font-display text-title leading-tight font-bold">
-            {checkTitle(first)}
+            {maskAccountIds(checkTitle(first))}
           </span>
           <span className="block text-secondary text-dim">
+            <span className="sr-only">, </span>
             {plural(items.length, "resource", "resources")}
           </span>
         </span>

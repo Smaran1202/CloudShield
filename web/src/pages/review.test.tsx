@@ -23,7 +23,7 @@ describe("Account ids are masked on screen", () => {
   });
 
   it("masks a 12-digit number in a title in the Findings list", async () => {
-    renderApp("/findings", {
+    renderApp("/findings?lane=open", {
       "GET /api/findings": [
         finding({ finding_id: ID, title: "Trail for 123456789012 is off" }),
       ],
@@ -155,7 +155,7 @@ describe("Mitigated by the account-wide block", () => {
   });
 
   it("shows the chip on a row of the Findings list", async () => {
-    renderApp("/findings", {
+    renderApp("/findings?lane=open", {
       "GET /api/findings": [
         finding({ finding_id: ID, mitigated_by_account_block: true }),
         finding({ finding_id: "F-OTHER", title: "Another finding" }),
@@ -196,8 +196,13 @@ describe("Fix page text", () => {
   it("shows a cost line only when the guardrail has one", async () => {
     await openFix({
       guardrails: [
-        guardrail({ cost: "The pricing page lists $0.003 per item." }),
-        guardrail({ id: "g2", title: "A guardrail with no known cost", cost: null }),
+        guardrail({ status: "active", cost: "The pricing page lists $0.003 per item." }),
+        guardrail({
+          id: "g2",
+          title: "A guardrail with no known cost",
+          status: "active",
+          cost: null,
+        }),
       ],
     });
 

@@ -67,20 +67,22 @@ function chip(name: string, count: number): HTMLElement {
 
 describe("Findings: states", () => {
   it("shows loading while findings are fetched", async () => {
-    renderApp("/findings", { "GET /api/findings": never });
+    renderApp("/findings?lane=open", { "GET /api/findings": never });
 
     expect(screen.getByText("Loading findings...")).toBeInTheDocument();
     await screen.findByText(/API online/);
   });
 
   it("shows the backend's message when findings cannot be loaded", async () => {
-    renderApp("/findings", { "GET /api/findings": fail(500, "database is locked") });
+    renderApp("/findings?lane=open", {
+      "GET /api/findings": fail(500, "database is locked"),
+    });
 
     expect(await screen.findByRole("alert")).toHaveTextContent("database is locked");
   });
 
   it("says there are no findings yet, without numbers", async () => {
-    renderApp("/findings", { "GET /api/findings": [] });
+    renderApp("/findings?lane=open", { "GET /api/findings": [] });
 
     expect(await screen.findByText("No findings yet.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^All/ })).not.toBeInTheDocument();
@@ -89,7 +91,7 @@ describe("Findings: states", () => {
 
 describe("Findings: page", () => {
   it("has a heading with the count, and says how many are open and fixed", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
       "6 findings.",
@@ -100,23 +102,25 @@ describe("Findings: page", () => {
   });
 
   it("uses the singular for one finding", async () => {
-    renderApp("/findings", { "GET /api/findings": [rows[0]] });
+    renderApp("/findings?lane=open", { "GET /api/findings": [rows[0]] });
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
       "1 finding.",
     );
   });
 
-  it("shows filter chips with their counts, and marks Open as pressed", async () => {
+  it("shows filter chips with their counts, and marks Fix now and Next as pressed", async () => {
     renderApp("/findings", { "GET /api/findings": rows });
 
-    await screen.findByRole("table");
-    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "true");
+    await screen.findByRole("table", { name: "Findings" });
+    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
+    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "false");
     expect(chip("All", 6)).toHaveAttribute("aria-pressed", "false");
     const chips = within(screen.getByRole("group", { name: "Lane" })).getAllByRole(
       "button",
     );
     expect(chips.map((c) => c.textContent?.replace(/\d+$/, ""))).toEqual([
+      "Fix now and Next",
       "Open",
       "Fix now",
       "Next",
@@ -132,7 +136,7 @@ describe("Findings: page", () => {
   });
 
   it("filters by lane when a chip is pressed, and keeps the choice in the URL", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.click(chip("Fix now", 2));
@@ -144,12 +148,17 @@ describe("Findings: page", () => {
 
     await user.click(chip("Open", 5));
 
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/findings$/);
+    expect(screen.getByTestId("location")).toHaveTextContent("/findings?lane=open");
     expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(chip("Fix now and Next", 3));
+
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/findings$/);
+    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps a finding with no score out of every lane, and a resolved finding in Done", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.click(chip("Later", 1));
@@ -170,7 +179,7 @@ describe("Findings: page", () => {
   });
 
   it("keeps the other filters in the URL too", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.selectOptions(screen.getByLabelText("Severity"), "HIGH");
@@ -181,7 +190,7 @@ describe("Findings: page", () => {
   });
 
   it("orders by risk score, high to low, with findings that have no score last", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     await screen.findByRole("table");
 
@@ -195,7 +204,7 @@ describe("Findings: page", () => {
   });
 
   it("reverses the order from the Risk heading, keeping findings without a score last", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: /Risk/ }));
@@ -214,7 +223,7 @@ describe("Findings: page", () => {
   });
 
   it("shows each row's lane, score, title, resource, rule, status and a link to the finding", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     const first = (await screen.findAllByRole("row"))[1];
     const cells = within(first).getAllByRole("cell");
@@ -229,7 +238,7 @@ describe("Findings: page", () => {
   });
 
   it("shows resolved findings as Resolved and shortens ARNs, keeping the full value in the title", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
     await user.click(chip("All", 6));
     const done = screen
@@ -240,7 +249,7 @@ describe("Findings: page", () => {
   });
 
   it("shows INFO findings in dim text, with no score", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     const info = (
       await screen.findByRole("link", { name: "Default encryption" })
@@ -254,7 +263,7 @@ describe("Findings: page", () => {
   });
 
   it("puts the table in a scrolling box with a sticky header and a minimum width", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     const table = await screen.findByRole("table");
 
@@ -267,7 +276,7 @@ describe("Findings: page", () => {
   });
 
   it("gives the header and every row the same grid, so the columns line up", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     const header = await screen.findByTestId("findings-header");
     const body = screen.getAllByRole("row").slice(1);
@@ -281,7 +290,7 @@ describe("Findings: page", () => {
   });
 
   it("marks the sort column with aria-sort, and only that one, and never wraps the heading", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
     const risk = screen.getByRole("columnheader", { name: /Risk/ });
     const seen = screen.getByRole("columnheader", { name: /Last seen/ });
@@ -299,7 +308,7 @@ describe("Findings: page", () => {
   it("shows last seen as a relative time with the full date as its tooltip", async () => {
     // Built from now, so the test does not depend on today's date.
     const lastSeen = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
-    renderApp("/findings", {
+    renderApp("/findings?lane=open", {
       "GET /api/findings": [finding({ last_seen_at: lastSeen })],
     });
 
@@ -311,7 +320,7 @@ describe("Findings: page", () => {
   });
 
   it("uses styled selects with a chevron icon, 44px tall, and 13px labels", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     for (const name of ["Severity", "Rule", "Resource type"]) {
@@ -327,7 +336,7 @@ describe("Findings: page", () => {
   });
 
   it("shows Clear filters only while a filter is set, and clears them", async () => {
-    const user = renderApp("/findings?q=bucket", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open&q=bucket", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
@@ -335,11 +344,11 @@ describe("Findings: page", () => {
     expect(
       screen.queryByRole("button", { name: "Clear filters" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText(/Showing 5 of/)).toBeInTheDocument();
+    expect(screen.getByText(/Showing 3 of/)).toBeInTheDocument();
   });
 
   it("shows lane chips with counts and aria-pressed", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
     const chips = within(screen.getByRole("group", { name: "Lane" }));
 
@@ -354,7 +363,7 @@ describe("Findings: page", () => {
   });
 
   it("shows only open findings by default, and says how many are shown", async () => {
-    renderApp("/findings", { "GET /api/findings": rows });
+    renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     await screen.findByRole("table");
 
@@ -363,18 +372,18 @@ describe("Findings: page", () => {
     expect(screen.getByText("Showing 5 of 6 findings")).toBeInTheDocument();
   });
 
-  it("treats an address with no lane as Open", async () => {
+  it("treats an address with no lane as Fix now and Next", async () => {
     renderApp("/findings?severity=HIGH", { "GET /api/findings": rows });
 
     await screen.findByRole("table");
 
-    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "true");
+    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
     expect(titles()).toHaveLength(3);
     expect(titles()).not.toContain("Fixed finding");
   });
 
   it("shows every finding under All, with resolved findings after every open one", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.click(chip("All", 6));
@@ -408,7 +417,7 @@ describe("Findings: page", () => {
   });
 
   it("filters by severity, rule and resource type", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.selectOptions(screen.getByLabelText("Severity"), "INFO");
@@ -423,7 +432,7 @@ describe("Findings: page", () => {
   });
 
   it("searches title, rule and resource, and says when nothing matches", async () => {
-    const user = renderApp("/findings", { "GET /api/findings": rows });
+    const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
     await user.type(screen.getByLabelText("Search"), "old-bucket");
@@ -435,7 +444,7 @@ describe("Findings: page", () => {
       await screen.findByText("No findings match these filters"),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear filters" }));
-    expect(await screen.findByRole("table")).toBeInTheDocument();
+    expect(await screen.findByRole("table", { name: "Findings" })).toBeInTheDocument();
   });
 });
 

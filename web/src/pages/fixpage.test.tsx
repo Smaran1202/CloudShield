@@ -272,6 +272,7 @@ describe("Fix page: each caveat once, and no blast radius", () => {
     });
 
     await user.click(await screen.findByRole("button", { name: "Generate fix" }));
+    await user.click(await screen.findByRole("button", { name: /^More detail/ }));
 
     const card = (
       await screen.findByRole("heading", { name: "CloudShield did not check" })

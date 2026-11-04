@@ -178,6 +178,24 @@
   copied text and the patches are not changed. It is not a guarantee: the full resource id (an ARN
   with the account id) is still shown on the Summary tab, in tooltips and in the resource pages, and
   any other 12-digit number is masked too.
+- The Findings list opens on "Fix now and Next". Later is below it as one collapsed row for each
+  check (open a row to see its findings), and informational findings are behind a count link.
+  Nothing is hidden for good: every lane chip, the Open chip (every open finding as one flat list)
+  and the Overview links show the full lists, and each count equals the list it opens. Any address
+  with a lane (`?lane=...`) shows that flat list, not the grouped view. An open finding that is
+  neither scored nor informational (only possible in data from before scoring existed) is not in
+  the default view; it is in the Open list.
+- "Dismiss all AWS-managed" dismisses every open finding that CloudShield suggested as not
+  applicable, with one reason of at least 10 characters. A suggestion can also come from
+  `CLOUDSHIELD_OWN_IDENTITIES`, so the list in the dialog shows the reason for each one: read it
+  before you confirm. It sends one dismissal for each finding to the usual endpoint, so a finding
+  that cannot be dismissed is reported by name and the rest still go through. Each dismissal can be
+  undone on its own, in the dialog or on the finding page.
+- The fix tab of our own findings shows a short first view: the action, the main patch, three
+  checks, two sentences of what could break, one row for each guardrail and the Verify button. The
+  rest (why it matters, rollback, what was not checked, the evidence, the guidance, the guardrails
+  CloudShield cannot read) is in the page behind buttons. The chosen patch format is remembered in
+  this browser only. An imported finding keeps its own layout.
 - A finding can be dismissed as accepted or not applicable, with a reason of at least 10
   characters and an optional end date. A dismissal "until" date ends at the end of that day in
   UTC, not in your own time zone. The finding then leaves the lanes and the headline counts, and

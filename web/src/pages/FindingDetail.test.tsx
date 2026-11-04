@@ -28,6 +28,11 @@ function steps(): string[] {
 
 const verifyPanel = () => screen.getByRole("region", { name: "Verify" });
 
+// The detail of an own finding's fix is behind one button. It stays in the page, only hidden.
+async function openDetail(user: ReturnType<typeof renderApp>) {
+  await user.click(screen.getByRole("button", { name: /^More detail/ }));
+}
+
 // The list items inside the open tab, not the ones in the stepper.
 const panelItems = () => within(screen.getByRole("tabpanel")).getAllByRole("listitem");
 const findPanelItems = async () => {
@@ -333,22 +338,30 @@ describe("Finding detail: Fix tab", () => {
   });
 
   it("shows the AI badge with the model name and the three explanation sections", async () => {
-    await generated();
+    const user = await generated();
 
     const card = screen
       .getByRole("heading", { name: "What this fix does" })
-      .closest("section");
-    expect(within(card as HTMLElement).getByText("AI explanation")).toBeInTheDocument();
+      .closest("section") as HTMLElement;
+    expect(within(card).getByText("AI explanation")).toBeInTheDocument();
     expect(screen.getByText("written by model-a")).toBeInTheDocument();
+    // The first view has the one-line action and what could break. The rest is in the detail.
     expect(
-      screen.getByText("Anyone on the internet can try to reach this port."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("The open rule is removed from the group."),
-    ).toBeInTheDocument();
+      within(card).getByText("The open rule is removed from the group."),
+    ).toBeVisible();
     expect(
       screen.getByText("People who connect through the rule lose access."),
-    ).toBeInTheDocument();
+    ).toBeVisible();
+    expect(
+      screen.getByText("Anyone on the internet can try to reach this port."),
+    ).not.toBeVisible();
+    await openDetail(user);
+    expect(
+      screen.getByText("Anyone on the internet can try to reach this port."),
+    ).toBeVisible();
+    expect(screen.getAllByText("The open rule is removed from the group.")).toHaveLength(
+      2,
+    );
   });
 
   it("shows a template badge with the reason Gemini was not used", async () => {
@@ -371,6 +384,7 @@ describe("Finding detail: Fix tab", () => {
 
   it("links cited evidence ids back to the evidence tab", async () => {
     const user = await generated();
+    await openDetail(user);
 
     const cited = screen.getByText("Cited evidence:").closest("p") as HTMLElement;
     const link = within(cited).getByRole("link", { name: "e2" });
@@ -384,7 +398,8 @@ describe("Finding detail: Fix tab", () => {
   });
 
   it("lists what CloudShield did not check, and has no blast radius anywhere", async () => {
-    await generated();
+    const user = await generated();
+    await openDetail(user);
 
     const card = screen
       .getByRole("heading", { name: "CloudShield did not check" })
@@ -402,8 +417,9 @@ describe("Finding detail: Fix tab", () => {
     expect(within(card).getAllByRole("checkbox").length).toBeGreaterThan(0);
   });
 
-  it("shows the evidence card next to the fix, with certainty chips", async () => {
-    await generated();
+  it("shows the evidence card in the detail, with certainty chips", async () => {
+    const user = await generated();
+    await openDetail(user);
 
     const card = screen
       .getByRole("heading", { name: "Evidence" })
@@ -551,6 +567,7 @@ describe("Finding detail: Fix tab", () => {
 
   it("asks for a refreshed fix when regenerating", async () => {
     const user = await generated();
+    await openDetail(user);
 
     await user.click(screen.getByRole("button", { name: "Regenerate explanation" }));
 

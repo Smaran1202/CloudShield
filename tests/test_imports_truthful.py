@@ -810,7 +810,7 @@ def test_the_migration_keeps_earlier_data_and_fills_the_new_fields(tmp_path, mon
 
 ACCOUNT_BLOCK_NOTE = (
     "The account-wide block is on, which the imported check may count, and it may look at only "
-    "two of the four settings (unverified: see Prowler's check page)."
+    "two of the four settings (unverified: see the imported check's documentation page)."
 )
 ACCOUNT_ON = {"s3_public_access_block": ALL_ON}
 

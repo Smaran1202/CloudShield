@@ -114,6 +114,12 @@ export function startWith(findings: FindingOut[]): FindingOut | null {
   return sorted[0] ?? null;
 }
 
+// The name of the check a finding belongs to: the scanner's own check title when it has one.
+export function checkTitle(row: FindingOut): string {
+  const own = row.details.check_title;
+  return typeof own === "string" && own ? own : row.title;
+}
+
 // "arn:aws:iam::123456789012:policy/name" is shown as "...:policy/name".
 export function shortResource(id: string): string {
   if (!id.startsWith("arn:")) return id;

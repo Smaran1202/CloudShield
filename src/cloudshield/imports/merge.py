@@ -18,7 +18,7 @@ NOT_COMPARED = "CloudShield could not read this setting, so the two results are 
 RATES_PREFIX = "The imported scan rates this "
 ACCOUNT_BLOCK_NOTE = (
     "The account-wide block is on, which the imported check may count, and it may look at only "
-    "two of the four settings (unverified: see Prowler's check page)."
+    "two of the four settings (unverified: see the imported check's documentation page)."
 )
 
 
