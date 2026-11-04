@@ -9,6 +9,8 @@ from cloudshield.findings import Finding
 from cloudshield.imports.merge import reconcile
 from cloudshield.imports.recheck import resolve_gone_resources
 from cloudshield.risk.environment import environment_score, severity_counts
+from cloudshield.rules.evidence import item
+from cloudshield.rules.unknown import missing_attribute
 
 # The scanner service that has to run without errors before a finding of this type can be
 # called fixed. imports/recheck.py has its own tables for a different question (is the resource
@@ -21,6 +23,11 @@ SERVICE_OF = {
     "IAM Role": "iam",
 }
 REGIONAL_TYPES = ("EC2", "Security Group")
+NOT_RESOLVED_START = "Not resolved: "
+NOT_RESOLVED = (
+    "Not resolved: the last scan has no value for {}, "
+    "so CloudShield cannot tell whether this was fixed."
+)
 
 
 def utcnow() -> datetime:
@@ -190,6 +197,12 @@ def resolve_fixed(
             if resource is None or resource.region not in scan.regions:
                 continue
         if row.resource_id in seen_ids:
+            # A key the scan left out is unknown even when it recorded no error.
+            stored = {"resource_type": row.resource_type, "attributes": resource.attributes}
+            unknown = missing_attribute(row.rule_id, stored)
+            if unknown:
+                note_not_resolved(row, unknown)
+                continue
             reason = "no longer detected"
         elif row.resource_type == "IAM Role":
             # Roles are only found through instances, so a role missing from the scan is not
@@ -201,3 +214,17 @@ def resolve_fixed(
         row.resolved_at = now
         row.resolution_reason = reason
         row.last_scan_id = scan.id
+        row.evidence = without_not_resolved(row.evidence)
+
+
+def note_not_resolved(row: FindingRow, attribute: str) -> None:
+    fact = NOT_RESOLVED.format(attribute)
+    items = row.evidence.get("items", [])
+    if not any(entry["fact"] == fact for entry in items):
+        note = item(fact, None, "latest scan", "unknown")
+        row.evidence = {**row.evidence, "items": [*items, note]}
+
+
+def without_not_resolved(evidence: dict) -> dict:
+    items = [i for i in evidence.get("items", []) if not i["fact"].startswith(NOT_RESOLVED_START)]
+    return {**evidence, "items": items}

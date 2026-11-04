@@ -72,7 +72,11 @@ Scenarios (the `scenario` column):
   counted in `scans_crashed` and are identical for both resolvers.
 - `silent_drop`: not a scanner behaviour. An attribute that a rule reads is removed from the scan
   result with no error recorded. The scanner never does this, because it records an error whenever
-  it leaves an attribute out. This probes whether the resolver depends on that.
+  it leaves an attribute out. This probes whether the resolver depends on that. The first run of
+  E1 found that it did: CloudShield wrongly resolved 10 of 63 findings. The resolver now also
+  keeps a finding open when the attribute its rule reads is absent from the stored resource
+  (`rules/unknown.py`), and the committed results show 0 wrong resolutions for it. The naive
+  resolver's numbers did not change.
 - `import_newer`: a first import opens 3 findings; a newer import then leaves the check out
   (`check_absent`), reports it as MANUAL, which is neither PASS nor FAIL (`ignored_status`), or
   reports it for another resource (`resource_absent`). The import files are synthetic.

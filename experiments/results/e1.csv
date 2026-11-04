@@ -107,19 +107,19 @@ scan_fault,s3control,throttling,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,com
 scan_fault,s3control,throttling,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,1
 scan_fault,s3control,missing_key,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,0
 scan_fault,s3control,missing_key,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,0
-silent_drop,s3,attribute_dropped,S3.public_access_block,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.public_access_block,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,s3,attribute_dropped,S3.public_access_block,naive,9,0,1,0,8,0,completed,0
-silent_drop,s3,attribute_dropped,S3.encryption,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.encryption,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,s3,attribute_dropped,S3.encryption,naive,9,0,1,0,8,0,completed,0
-silent_drop,s3,attribute_dropped,S3.versioning,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.versioning,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,s3,attribute_dropped,S3.versioning,naive,9,0,1,0,8,0,completed,0
-silent_drop,ec2,attribute_dropped,Security Group.inbound,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,ec2,attribute_dropped,Security Group.inbound,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,ec2,attribute_dropped,Security Group.inbound,naive,9,0,1,0,8,0,completed,0
-silent_drop,iam,attribute_dropped,IAM Policy.document,cloudshield,9,0,4,0,5,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Policy.document,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,iam,attribute_dropped,IAM Policy.document,naive,9,0,4,0,5,0,completed,0
-silent_drop,iam,attribute_dropped,IAM Role.attached_policies,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.attached_policies,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,iam,attribute_dropped,IAM Role.attached_policies,naive,9,0,1,0,8,0,completed,0
-silent_drop,iam,attribute_dropped,IAM Role.inline_policies,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.inline_policies,cloudshield,9,0,0,0,9,0,completed,0
 silent_drop,iam,attribute_dropped,IAM Role.inline_policies,naive,9,0,1,0,8,0,completed,0
 import_newer,import,check_absent,B and C left out,cloudshield,3,0,0,0,3,0,imported,0
 import_newer,import,check_absent,B and C left out,naive,3,0,2,0,1,0,imported,0

@@ -17,5 +17,5 @@ scan_fault,missing_key,cloudshield,18,162,0,0,162,0,0,13
 scan_fault,missing_key,naive,18,162,0,0,162,0,0,13
 scan_fault,throttling,cloudshield,18,162,0,0,162,0,0,0
 scan_fault,throttling,naive,18,162,25,0,137,0,14,0
-silent_drop,attribute_dropped,cloudshield,7,63,10,0,53,0,7,0
+silent_drop,attribute_dropped,cloudshield,7,63,0,0,63,0,0,0
 silent_drop,attribute_dropped,naive,7,63,10,0,53,0,7,0

@@ -198,3 +198,17 @@ def test_run_writes_the_csv_files_with_the_documented_columns(tmp_path):
     assert (tmp_path / "e1_summary.csv").exists()
     scan_faults = [row for row in written if row["scenario"] == "scan_fault"]
     assert len(scan_faults) == 3 * 2
+
+
+def test_an_attribute_dropped_without_an_error_is_never_resolved_by_cloudshield(world):
+    setup, _ = world
+
+    rows = e1.silent_drop_rows(setup)
+
+    kept = [row for row in rows if row["resolver"] == "cloudshield"]
+    naive = [row for row in rows if row["resolver"] == "naive"]
+    assert len(kept) == len(naive) == len(e1.SILENT_DROPS)
+    assert all(row["errors_recorded"] == 0 for row in rows)
+    assert sum(row["wrongly_resolved"] for row in kept) == 0
+    assert sum(row["correctly_kept_open"] for row in kept) == len(kept) * len(setup.before)
+    assert sum(row["wrongly_resolved"] for row in naive) == 10

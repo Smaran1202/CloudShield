@@ -47,6 +47,15 @@
 - A finding on an IAM role is never resolved as "resource not found", because roles are only
   found through instances. It can be resolved as "no longer detected" while the role is still
   returned by the scan.
+- A finding is also not resolved when the attribute its rule reads is absent from the stored
+  resource, even if the scan recorded no error. It stays open, and its evidence gets an item with
+  certainty `unknown` that starts with "Not resolved:". A key that is there with the value `None`
+  or empty is a real reading and works as before: "no public access block" is still detected, and an
+  empty list of inbound rules still resolves a finding. The scanner leaves a key out only when a
+  call failed, and then it records the error, so this changes nothing on real scans. It guards
+  against a scanner that omits a value without an error (experiment E1, `silent_drop`). It covers
+  the S3 public access block, encryption and versioning, security group rules, IAM policy
+  documents, and the policies of a role.
 - Resources that disappear are not deleted from the resources table; it keeps the latest known
   state, and `last_seen_scan_id` shows when it was last seen.
 - Only one scan can run at a time. This is enforced inside one server process, so run a single

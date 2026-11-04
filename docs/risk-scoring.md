@@ -64,7 +64,10 @@ cut-offs are written once, in `web/src/lanes.ts`.
   are not checked. Privilege escalation evidence is heuristic, because permission boundaries,
   service control policies and resource policies are not evaluated.
 - `unknown`: the data needed was not available, for example a call failed or the region was not
-  scanned. An unknown factor always has `adjustment` 0, so missing data never adds risk.
+  scanned. An unknown factor always has `adjustment` 0, so missing data never adds risk. An open
+  finding that is not resolved because the scan has no value for what its rule reads gets an
+  `unknown` evidence item that says so. The item goes away when the finding is found again or
+  resolved.
 
 The exposure factors describe configuration only. They do not test whether a resource can actually
 be reached.
