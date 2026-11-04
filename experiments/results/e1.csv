@@ -1,0 +1,135 @@
+scenario,service,fault,detail,resolver,findings_open_before,truly_fixed,wrongly_resolved,correctly_resolved,correctly_kept_open,wrongly_kept_open,scan_outcome,errors_recorded
+scan_fault,s3,access_denied,ListBuckets,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,ListBuckets,naive,9,0,3,0,6,0,completed,1
+scan_fault,s3,throttling,ListBuckets,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,ListBuckets,naive,9,0,3,0,6,0,completed,1
+scan_fault,s3,missing_key,ListBuckets,cloudshield,9,0,0,0,9,0,crashed: KeyError 'Buckets',0
+scan_fault,s3,missing_key,ListBuckets,naive,9,0,0,0,9,0,crashed: KeyError 'Buckets',0
+scan_fault,s3,access_denied,GetBucketLocation,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,GetBucketLocation,naive,9,0,3,0,6,0,completed,1
+scan_fault,s3,throttling,GetBucketLocation,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetBucketLocation,naive,9,0,3,0,6,0,completed,1
+scan_fault,s3,missing_key,GetBucketLocation,cloudshield,9,0,0,0,9,0,crashed: KeyError 'LocationConstraint',0
+scan_fault,s3,missing_key,GetBucketLocation,naive,9,0,0,0,9,0,crashed: KeyError 'LocationConstraint',0
+scan_fault,s3,access_denied,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,GetPublicAccessBlock,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,throttling,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetPublicAccessBlock,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,missing_key,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,0
+scan_fault,s3,missing_key,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,0
+scan_fault,s3,access_denied,GetBucketEncryption,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,GetBucketEncryption,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,throttling,GetBucketEncryption,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetBucketEncryption,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,missing_key,GetBucketEncryption,cloudshield,9,0,0,0,9,0,completed,0
+scan_fault,s3,missing_key,GetBucketEncryption,naive,9,0,0,0,9,0,completed,0
+scan_fault,s3,access_denied,GetBucketVersioning,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,GetBucketVersioning,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,throttling,GetBucketVersioning,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetBucketVersioning,naive,9,0,1,0,8,0,completed,1
+scan_fault,s3,missing_key,GetBucketVersioning,cloudshield,9,0,0,0,9,0,completed,0
+scan_fault,s3,missing_key,GetBucketVersioning,naive,9,0,0,0,9,0,completed,0
+scan_fault,s3,access_denied,GetBucketPolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,access_denied,GetBucketPolicy,naive,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetBucketPolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3,throttling,GetBucketPolicy,naive,9,0,0,0,9,0,completed,1
+scan_fault,s3,missing_key,GetBucketPolicy,cloudshield,9,0,0,0,9,0,completed,0
+scan_fault,s3,missing_key,GetBucketPolicy,naive,9,0,0,0,9,0,completed,0
+scan_fault,ec2,access_denied,DescribeInstances,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,ec2,access_denied,DescribeInstances,naive,9,0,1,0,8,0,completed,1
+scan_fault,ec2,throttling,DescribeInstances,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,ec2,throttling,DescribeInstances,naive,9,0,1,0,8,0,completed,1
+scan_fault,ec2,missing_key,DescribeInstances,cloudshield,9,0,0,0,9,0,crashed: KeyError 'Reservations',0
+scan_fault,ec2,missing_key,DescribeInstances,naive,9,0,0,0,9,0,crashed: KeyError 'Reservations',0
+scan_fault,ec2,access_denied,DescribeSecurityGroups,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,ec2,access_denied,DescribeSecurityGroups,naive,9,0,1,0,8,0,completed,1
+scan_fault,ec2,throttling,DescribeSecurityGroups,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,ec2,throttling,DescribeSecurityGroups,naive,9,0,1,0,8,0,completed,1
+scan_fault,ec2,missing_key,DescribeSecurityGroups,cloudshield,9,0,0,0,9,0,crashed: KeyError 'SecurityGroups',0
+scan_fault,ec2,missing_key,DescribeSecurityGroups,naive,9,0,0,0,9,0,crashed: KeyError 'SecurityGroups',0
+scan_fault,iam,access_denied,ListPolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,ListPolicies,naive,9,0,4,0,5,0,completed,1
+scan_fault,iam,throttling,ListPolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,ListPolicies,naive,9,0,4,0,5,0,completed,1
+scan_fault,iam,missing_key,ListPolicies,cloudshield,9,0,0,0,9,0,crashed: KeyError 'Policies',0
+scan_fault,iam,missing_key,ListPolicies,naive,9,0,0,0,9,0,crashed: KeyError 'Policies',0
+scan_fault,iam,access_denied,GetPolicyVersion,cloudshield,9,0,0,0,9,0,completed,3
+scan_fault,iam,access_denied,GetPolicyVersion,naive,9,0,5,0,4,0,completed,3
+scan_fault,iam,throttling,GetPolicyVersion,cloudshield,9,0,0,0,9,0,completed,3
+scan_fault,iam,throttling,GetPolicyVersion,naive,9,0,5,0,4,0,completed,3
+scan_fault,iam,missing_key,GetPolicyVersion,cloudshield,9,0,0,0,9,0,crashed: KeyError 'PolicyVersion',0
+scan_fault,iam,missing_key,GetPolicyVersion,naive,9,0,0,0,9,0,crashed: KeyError 'PolicyVersion',0
+scan_fault,iam,access_denied,ListEntitiesForPolicy,cloudshield,9,0,0,0,9,0,completed,2
+scan_fault,iam,access_denied,ListEntitiesForPolicy,naive,9,0,0,0,9,0,completed,2
+scan_fault,iam,throttling,ListEntitiesForPolicy,cloudshield,9,0,0,0,9,0,completed,2
+scan_fault,iam,throttling,ListEntitiesForPolicy,naive,9,0,0,0,9,0,completed,2
+scan_fault,iam,missing_key,ListEntitiesForPolicy,cloudshield,9,0,0,0,9,0,crashed: KeyError 'PolicyUsers',0
+scan_fault,iam,missing_key,ListEntitiesForPolicy,naive,9,0,0,0,9,0,crashed: KeyError 'PolicyUsers',0
+scan_fault,iam,access_denied,GetInstanceProfile,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,GetInstanceProfile,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,throttling,GetInstanceProfile,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,GetInstanceProfile,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,missing_key,GetInstanceProfile,cloudshield,9,0,0,0,9,0,crashed: KeyError 'InstanceProfile',0
+scan_fault,iam,missing_key,GetInstanceProfile,naive,9,0,0,0,9,0,crashed: KeyError 'InstanceProfile',0
+scan_fault,iam,access_denied,ListAttachedRolePolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,ListAttachedRolePolicies,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,throttling,ListAttachedRolePolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,ListAttachedRolePolicies,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,missing_key,ListAttachedRolePolicies,cloudshield,9,0,0,0,9,0,crashed: KeyError 'AttachedPolicies',0
+scan_fault,iam,missing_key,ListAttachedRolePolicies,naive,9,0,0,0,9,0,crashed: KeyError 'AttachedPolicies',0
+scan_fault,iam,access_denied,ListRolePolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,ListRolePolicies,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,throttling,ListRolePolicies,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,ListRolePolicies,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,missing_key,ListRolePolicies,cloudshield,9,0,0,0,9,0,crashed: KeyError 'PolicyNames',0
+scan_fault,iam,missing_key,ListRolePolicies,naive,9,0,0,0,9,0,crashed: KeyError 'PolicyNames',0
+scan_fault,iam,access_denied,GetRolePolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,GetRolePolicy,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,throttling,GetRolePolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,GetRolePolicy,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,missing_key,GetRolePolicy,cloudshield,9,0,0,0,9,0,crashed: KeyError 'PolicyDocument',0
+scan_fault,iam,missing_key,GetRolePolicy,naive,9,0,0,0,9,0,crashed: KeyError 'PolicyDocument',0
+scan_fault,iam,access_denied,GetPolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,access_denied,GetPolicy,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,throttling,GetPolicy,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,iam,throttling,GetPolicy,naive,9,0,1,0,8,0,completed,1
+scan_fault,iam,missing_key,GetPolicy,cloudshield,9,0,0,0,9,0,crashed: KeyError 'Policy',0
+scan_fault,iam,missing_key,GetPolicy,naive,9,0,0,0,9,0,crashed: KeyError 'Policy',0
+scan_fault,sts,access_denied,GetCallerIdentity,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,sts,access_denied,GetCallerIdentity,naive,9,0,0,0,9,0,completed,1
+scan_fault,sts,throttling,GetCallerIdentity,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,sts,throttling,GetCallerIdentity,naive,9,0,0,0,9,0,completed,1
+scan_fault,sts,missing_key,GetCallerIdentity,cloudshield,9,0,0,0,9,0,crashed: KeyError 'Account',0
+scan_fault,sts,missing_key,GetCallerIdentity,naive,9,0,0,0,9,0,crashed: KeyError 'Account',0
+scan_fault,s3control,access_denied,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3control,access_denied,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,1
+scan_fault,s3control,throttling,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,1
+scan_fault,s3control,throttling,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,1
+scan_fault,s3control,missing_key,GetPublicAccessBlock,cloudshield,9,0,0,0,9,0,completed,0
+scan_fault,s3control,missing_key,GetPublicAccessBlock,naive,9,0,0,0,9,0,completed,0
+silent_drop,s3,attribute_dropped,S3.public_access_block,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.public_access_block,naive,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.encryption,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.encryption,naive,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.versioning,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,s3,attribute_dropped,S3.versioning,naive,9,0,1,0,8,0,completed,0
+silent_drop,ec2,attribute_dropped,Security Group.inbound,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,ec2,attribute_dropped,Security Group.inbound,naive,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Policy.document,cloudshield,9,0,4,0,5,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Policy.document,naive,9,0,4,0,5,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.attached_policies,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.attached_policies,naive,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.inline_policies,cloudshield,9,0,1,0,8,0,completed,0
+silent_drop,iam,attribute_dropped,IAM Role.inline_policies,naive,9,0,1,0,8,0,completed,0
+import_newer,import,check_absent,B and C left out,cloudshield,3,0,0,0,3,0,imported,0
+import_newer,import,check_absent,B and C left out,naive,3,0,2,0,1,0,imported,0
+import_newer,import,ignored_status,B and C are MANUAL,cloudshield,3,0,0,0,3,0,imported,0
+import_newer,import,ignored_status,B and C are MANUAL,naive,3,0,2,0,1,0,imported,0
+import_newer,import,resource_absent,A for another bucket,cloudshield,3,0,0,0,3,0,imported,0
+import_newer,import,resource_absent,A for another bucket,naive,3,0,1,0,2,0,imported,0
+import_newer,import,check_passes,"A, B and C pass",cloudshield,3,3,0,3,0,0,imported,0
+import_newer,import,check_passes,"A, B and C pass",naive,3,3,0,3,0,0,imported,0
+control_fixed,s3,none,bucket fixed,cloudshield,9,3,0,3,6,0,completed,0
+control_fixed,s3,none,bucket fixed,naive,9,3,0,3,6,0,completed,0
+control_fixed,ec2,access_denied,"bucket fixed, security groups denied",cloudshield,9,3,0,3,6,0,completed,1
+control_fixed,ec2,access_denied,"bucket fixed, security groups denied",naive,9,3,1,3,5,0,completed,1

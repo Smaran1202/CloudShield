@@ -26,6 +26,10 @@ dev = [
     "moto[ec2,iam,s3]",
     "pyyaml",
 ]
+# Only the research experiments use this (experiments/README.md). cfn-lint is MIT-0 licensed.
+experiments = [
+    "cfn-lint==1.59.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -35,6 +39,8 @@ cloudshield = ["ai/knowledge/*.md", "db/migrations/script.py.mako"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# So the tests can import the experiments/ folder, which is not part of the installed package.
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

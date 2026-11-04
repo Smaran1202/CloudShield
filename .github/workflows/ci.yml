@@ -17,6 +17,28 @@ jobs:
       - run: ruff format --check --diff .
       - run: pytest -q
 
+  # Runs the part of E4 that needs Terraform and cfn-lint, which are not available on every machine.
+  experiments-e4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+          terraform_wrapper: false
+      - run: pip install -e ".[dev,experiments]"
+      - run: terraform version
+      - run: python -m experiments.e4 --terraform --out e4-results
+      - run: pytest -q tests/test_experiments_e4.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e4-results
+          path: e4-results/e4.csv
+
   web:
     runs-on: ubuntu-latest
     defaults:
