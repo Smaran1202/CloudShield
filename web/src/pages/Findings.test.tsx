@@ -90,15 +90,27 @@ describe("Findings: states", () => {
 });
 
 describe("Findings: page", () => {
-  it("has a heading with the count, and says how many are open and fixed", async () => {
+  it("has a heading with the count, and one line of counts that link to the tabs", async () => {
     renderApp("/findings?lane=open", { "GET /api/findings": rows });
 
     expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
       "6 findings.",
     );
+    expect(screen.getByRole("link", { name: "3 to do" })).toHaveAttribute(
+      "href",
+      "/findings",
+    );
+    expect(screen.getByRole("link", { name: "1 later" })).toHaveAttribute(
+      "href",
+      "/findings?lane=later",
+    );
+    expect(screen.getByRole("link", { name: "1 done" })).toHaveAttribute(
+      "href",
+      "/findings?lane=done",
+    );
     expect(
-      screen.getByText("5 open, 1 fixed. Ordered by what to fix first."),
-    ).toBeInTheDocument();
+      screen.getByRole("heading", { level: 1 }).nextElementSibling,
+    ).toHaveTextContent("3 to do, 1 later, 1 done");
   });
 
   it("uses the singular for one finding", async () => {
@@ -109,52 +121,49 @@ describe("Findings: page", () => {
     );
   });
 
-  it("shows filter chips with their counts, and marks Fix now and Next as pressed", async () => {
+  it("shows four tabs at most, with their counts, and leaves out an empty one", async () => {
     renderApp("/findings", { "GET /api/findings": rows });
 
     await screen.findByRole("table", { name: "Findings" });
-    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
-    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "false");
-    expect(chip("All", 6)).toHaveAttribute("aria-pressed", "false");
     const chips = within(screen.getByRole("group", { name: "Lane" })).getAllByRole(
       "button",
     );
     expect(chips.map((c) => c.textContent?.replace(/\d+$/, ""))).toEqual([
-      "Fix now and Next",
-      "Open",
-      "Fix now",
-      "Next",
+      "To do",
       "Later",
       "Done",
-      "Dismissed",
-      "All",
     ]);
-    expect(chip("Fix now", 2)).toHaveAttribute("aria-pressed", "false");
-    expect(chip("Next", 1)).toHaveAttribute("aria-pressed", "false");
+    expect(chip("To do", 3)).toHaveAttribute("aria-pressed", "true");
     expect(chip("Later", 1)).toHaveAttribute("aria-pressed", "false");
     expect(chip("Done", 1)).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: /^Dismissed/ })).toBeNull();
   });
 
-  it("filters by lane when a chip is pressed, and keeps the choice in the URL", async () => {
+  it("filters by tab and by Status, and keeps the choice in the URL", async () => {
     const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
-    await user.click(chip("Fix now", 2));
+    await user.click(chip("Later", 1));
 
-    expect(chip("Fix now", 2)).toHaveAttribute("aria-pressed", "true");
-    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "false");
+    expect(chip("Later", 1)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Status")).toHaveValue("");
+    expect(titles()).toEqual(["No versioning"]);
+    expect(screen.getByTestId("location")).toHaveTextContent("/findings?lane=later");
+
+    await user.selectOptions(screen.getByLabelText("Status"), "now");
+
+    expect(chip("Later", 1)).toHaveAttribute("aria-pressed", "false");
     expect(titles()).toEqual(["Open SSH to the world", "Public bucket"]);
     expect(screen.getByTestId("location")).toHaveTextContent("/findings?lane=now");
 
-    await user.click(chip("Open", 5));
+    await user.selectOptions(screen.getByLabelText("Status"), "open");
 
     expect(screen.getByTestId("location")).toHaveTextContent("/findings?lane=open");
-    expect(chip("Open", 5)).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(chip("Fix now and Next", 3));
+    await user.click(chip("To do", 3));
 
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/findings$/);
-    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
+    expect(chip("To do", 3)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps a finding with no score out of every lane, and a resolved finding in Done", async () => {
@@ -173,7 +182,7 @@ describe("Findings: page", () => {
 
     await screen.findByRole("table");
 
-    expect(chip("Fix now", 2)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Status")).toHaveValue("now");
     expect(screen.getByLabelText("Severity")).toHaveValue("HIGH");
     expect(titles()).toHaveLength(2);
   });
@@ -240,7 +249,7 @@ describe("Findings: page", () => {
   it("shows resolved findings as Resolved and shortens ARNs, keeping the full value in the title", async () => {
     const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
-    await user.click(chip("All", 6));
+    await user.selectOptions(screen.getByLabelText("Status"), "all");
     const done = screen
       .getByRole("link", { name: "Fixed finding" })
       .closest("[role=row]");
@@ -347,19 +356,14 @@ describe("Findings: page", () => {
     expect(screen.getByText(/Showing 3 of/)).toBeInTheDocument();
   });
 
-  it("shows lane chips with counts and aria-pressed", async () => {
+  it("shows no tab as pressed while a Status choice is active", async () => {
     renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
     const chips = within(screen.getByRole("group", { name: "Lane" }));
 
-    expect(chips.getByRole("button", { name: /^Open/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(chips.getByRole("button", { name: /^Fix now\s*2$/ })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(screen.getByLabelText("Status")).toHaveValue("open");
+    for (const tab of chips.getAllByRole("button"))
+      expect(tab).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows only open findings by default, and says how many are shown", async () => {
@@ -377,7 +381,7 @@ describe("Findings: page", () => {
 
     await screen.findByRole("table");
 
-    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
+    expect(chip("To do", 3)).toHaveAttribute("aria-pressed", "true");
     expect(titles()).toHaveLength(3);
     expect(titles()).not.toContain("Fixed finding");
   });
@@ -386,9 +390,9 @@ describe("Findings: page", () => {
     const user = renderApp("/findings?lane=open", { "GET /api/findings": rows });
     await screen.findByRole("table");
 
-    await user.click(chip("All", 6));
+    await user.selectOptions(screen.getByLabelText("Status"), "all");
 
-    expect(chip("All", 6)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByLabelText("Status")).toHaveValue("all");
     expect(screen.getByTestId("location")).toHaveTextContent("/findings?lane=all");
     expect(titles()).toEqual([
       "Open SSH to the world",

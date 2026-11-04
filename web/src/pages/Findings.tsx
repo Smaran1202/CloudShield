@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, SEVERITIES, type FindingOut } from "../api";
 import { BulkDismissDialog } from "../components/BulkDismissDialog";
@@ -80,6 +80,29 @@ function readFilters(params: URLSearchParams): Filters {
   };
 }
 
+// The lane values that are a Status choice in the Filters fold, not a tab. Old links still use them.
+const STATUS_LANES: Filters["lane"][] = ["now", "next", "open", "all"];
+
+type Tab = {
+  lane: "focus" | "later" | "done" | "dismissed";
+  label: string;
+  word: string;
+  count: number;
+  dot?: Lane;
+};
+
+// The filters inside the fold. The search box is always visible, so it is not counted.
+function activeFilters(filters: Filters): number {
+  const set = [
+    filters.severity,
+    filters.rule,
+    filters.type,
+    filters.source,
+    filters.info,
+  ];
+  return set.filter(Boolean).length + (STATUS_LANES.includes(filters.lane) ? 1 : 0);
+}
+
 // The lanes use the shared rule in lanes.ts, so a count and the list behind it always agree.
 function inChosenLane(row: FindingOut, lane: Filters["lane"]): boolean {
   if (lane === "all") return true;
@@ -146,6 +169,17 @@ export function Findings() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const foldId = useId();
+  // Open from the start when the link already sets a filter, so the reader can see it.
+  const [foldOpen, setFoldOpen] = useState(() => activeFilters(filters) > 0);
+
+  function clearFilters() {
+    const next = new URLSearchParams(params);
+    for (const name of ["q", "severity", "rule", "type", "source", "info"])
+      next.delete(name);
+    if (STATUS_LANES.includes(filters.lane)) next.delete("lane");
+    setParams(next, { replace: true });
+  }
 
   function change(name: string, value: string) {
     const next = new URLSearchParams(params);
@@ -180,58 +214,73 @@ export function Findings() {
           );
         }
         const counts = countLanes(rows);
-        const open = rows.filter(isActive).length;
-        const dismissed = rows.filter((r) => inChosenLane(r, "dismissed")).length;
+        const dismissed = rows.filter(isDismissed).length;
         const visible = applyFilters(rows, filters);
         const suggested = rows.filter((r) => isActive(r) && r.suggested_not_applicable);
         const focused = filters.lane === "focus";
         const types = [...new Set(rows.map((r) => r.resource_type))].sort();
+        const tabs: Tab[] = [
+          {
+            lane: "focus",
+            label: "To do",
+            word: "to do",
+            count: counts.now + counts.next,
+          },
+          {
+            lane: "later",
+            label: "Later",
+            word: "later",
+            count: counts.later,
+            dot: "later",
+          },
+          { lane: "done", label: "Done", word: "done", count: counts.done, dot: "done" },
+          { lane: "dismissed", label: "Dismissed", word: "dismissed", count: dismissed },
+        ];
+        // An empty tab is left out, unless it is the one being shown.
+        const shown = tabs.filter((t) => t.count > 0 || t.lane === filters.lane);
+        const summary = tabs
+          .filter((t) => t.count > 0)
+          .flatMap((t, index) => [
+            index > 0 ? ", " : "",
+            <Link
+              key={t.lane}
+              to={t.lane === "focus" ? "/findings" : `/findings?lane=${t.lane}`}
+              className="font-semibold text-ink underline"
+            >
+              {t.count} {t.word}
+            </Link>,
+          ]);
+        const active = activeFilters(filters);
         return (
           <>
-            <PageTitle
-              sub={`${open} open, ${counts.done} fixed. Ordered by what to fix first.`}
-            >
+            <PageTitle sub={summary.length > 0 ? summary : undefined}>
               {plural(rows.length, "finding", "findings")}.
             </PageTitle>
 
-            <div className="mb-6 flex flex-wrap gap-2" role="group" aria-label="Lane">
-              <LaneChip
-                label="Fix now and Next"
-                count={counts.now + counts.next}
-                pressed={filters.lane === "focus"}
-                onClick={() => change("lane", "")}
-              />
-              <LaneChip
-                label="Open"
-                count={open}
-                pressed={filters.lane === "open"}
-                onClick={() => change("lane", "open")}
-              />
-              {LANES.map((lane) => (
-                <LaneChip
-                  key={lane}
-                  lane={lane}
-                  label={LANE_NAME[lane]}
-                  count={counts[lane]}
-                  pressed={filters.lane === lane}
-                  onClick={() => change("lane", lane)}
-                />
-              ))}
-              <LaneChip
-                label="Dismissed"
-                count={dismissed}
-                pressed={filters.lane === "dismissed"}
-                onClick={() => change("lane", "dismissed")}
-              />
-              <LaneChip
-                label="All"
-                count={rows.length}
-                pressed={filters.lane === "all"}
-                onClick={() => change("lane", "all")}
-              />
+            <div className="mb-6 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Lane">
+                {shown.map((t) => (
+                  <LaneChip
+                    key={t.lane}
+                    lane={t.dot}
+                    label={t.label}
+                    count={t.count}
+                    pressed={filters.lane === t.lane}
+                    onClick={() => change("lane", t.lane === "focus" ? "" : t.lane)}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                aria-pressed={filters.group}
+                onClick={() => change("group", filters.group ? "" : "check")}
+                className="inline-flex min-h-11 items-center gap-2 rounded-chip border-2 border-ink px-4 text-secondary font-semibold aria-pressed:bg-ink aria-pressed:text-white"
+              >
+                Group by check
+              </button>
             </div>
 
-            <div className="mb-8 flex flex-wrap items-end gap-4">
+            <div className="mb-4 flex flex-wrap items-end gap-4">
               <label className="flex flex-col gap-1 text-label font-semibold">
                 Search
                 <input
@@ -242,86 +291,99 @@ export function Findings() {
                   className={`${FIELD} min-w-[240px]`}
                 />
               </label>
-              <SelectField
-                label="Severity"
-                value={filters.severity}
-                onChange={(v) => change("severity", v)}
-                options={[
-                  ["", "All severities"],
-                  ...SEVERITIES.map((s): [string, string] => [s, s]),
-                ]}
-              />
-              <SelectField
-                label="Rule"
-                value={filters.rule}
-                onChange={(v) => change("rule", v)}
-                options={[
-                  ["", "All rules"],
-                  ...ruleOptions(rows).map((r): [string, string] => [r, r]),
-                ]}
-              />
-              <SelectField
-                label="Source"
-                value={filters.source}
-                onChange={(v) => change("source", v)}
-                options={[
-                  ["", "All sources"],
-                  ["cloudshield", "CloudShield"],
-                  ["prowler", "Imported"],
-                ]}
-              />
-              <SelectField
-                label="Informational"
-                value={filters.info}
-                onChange={(v) => change("info", v)}
-                options={[
-                  ["", "Included"],
-                  ["hide", "Hidden"],
-                  ["only", "Only informational"],
-                ]}
-              />
-              <SelectField
-                label="Resource type"
-                value={filters.type}
-                onChange={(v) => change("type", v)}
-                options={[
-                  ["", "All types"],
-                  ...types.map((t): [string, string] => [t, t]),
-                ]}
-              />
-            </div>
-
-            {suggested.length > 0 && (
               <button
                 type="button"
-                onClick={() => setBulkOpen(true)}
-                className={`mr-3 mb-4 ${SECONDARY_BUTTON}`}
+                aria-expanded={foldOpen}
+                aria-controls={foldId}
+                onClick={() => setFoldOpen(!foldOpen)}
+                className="inline-flex min-h-11 items-center gap-2 rounded-chip border-2 border-ink bg-white px-4 text-secondary font-semibold"
               >
-                Dismiss all AWS-managed ({suggested.length})
+                <Icon name="chevron" size={18} className={foldOpen ? "rotate-180" : ""} />
+                {active > 0 ? `Filters (${active})` : "Filters"}
               </button>
-            )}
-            <button
-              type="button"
-              aria-pressed={filters.group}
-              onClick={() => change("group", filters.group ? "" : "check")}
-              className="mb-4 inline-flex min-h-11 items-center gap-2 rounded-chip border-2 border-ink px-4 text-secondary font-semibold aria-pressed:bg-ink aria-pressed:text-white"
-            >
-              Group by check
-            </button>
-            <p
-              role="status"
-              className="mb-2 flex flex-wrap items-center gap-4 text-secondary text-dim"
-            >
-              Showing {visible.length} of {rows.length} findings
-              {params.toString() !== "" && (
+              {(active > 0 || filters.q !== "") && (
                 <button
                   type="button"
-                  className="font-semibold text-ink underline"
-                  onClick={() => setParams({})}
+                  className="inline-flex min-h-11 items-center font-semibold text-ink underline"
+                  onClick={clearFilters}
                 >
                   Clear filters
                 </button>
               )}
+              {suggested.length > 0 && (
+                <MoreMenu
+                  count={suggested.length}
+                  onDismissAll={() => setBulkOpen(true)}
+                />
+              )}
+            </div>
+
+            <div id={foldId} hidden={!foldOpen}>
+              <div className="mb-4 flex flex-wrap items-end gap-4 rounded-chip border-2 border-ink bg-white p-4">
+                <SelectField
+                  label="Severity"
+                  value={filters.severity}
+                  onChange={(v) => change("severity", v)}
+                  options={[
+                    ["", "All severities"],
+                    ...SEVERITIES.map((s): [string, string] => [s, s]),
+                  ]}
+                />
+                <SelectField
+                  label="Rule"
+                  value={filters.rule}
+                  onChange={(v) => change("rule", v)}
+                  options={[
+                    ["", "All rules"],
+                    ...ruleOptions(rows).map((r): [string, string] => [r, r]),
+                  ]}
+                />
+                <SelectField
+                  label="Source"
+                  value={filters.source}
+                  onChange={(v) => change("source", v)}
+                  options={[
+                    ["", "All sources"],
+                    ["cloudshield", "CloudShield"],
+                    ["prowler", "Imported"],
+                  ]}
+                />
+                <SelectField
+                  label="Resource type"
+                  value={filters.type}
+                  onChange={(v) => change("type", v)}
+                  options={[
+                    ["", "All types"],
+                    ...types.map((t): [string, string] => [t, t]),
+                  ]}
+                />
+                <SelectField
+                  label="Informational"
+                  value={filters.info}
+                  onChange={(v) => change("info", v)}
+                  options={[
+                    ["", "Included"],
+                    ["hide", "Hidden"],
+                    ["only", "Only informational"],
+                  ]}
+                />
+                <SelectField
+                  label="Status"
+                  value={STATUS_LANES.includes(filters.lane) ? filters.lane : ""}
+                  onChange={(v) => change("lane", v)}
+                  options={[
+                    ["", "Set by the tab"],
+                    ["now", "Fix now only"],
+                    ["next", "Next only"],
+                    ["open", "Open"],
+                    ["all", "All"],
+                  ]}
+                />
+              </div>
+            </div>
+
+            <p role="status" className="mb-2 text-secondary text-dim">
+              Showing {visible.length} of {rows.length} findings
             </p>
             {visible.length === 0 ? (
               <EmptyState
@@ -403,6 +465,54 @@ function LaterAndInformational({
           </Link>
           . They have no risk score.
         </p>
+      )}
+    </div>
+  );
+}
+
+// shortcut: closes on Escape or a second press, not on a click elsewhere; fine while it has one item.
+function MoreMenu({ count, onDismissAll }: { count: number; onDismissAll: () => void }) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const toggle = useRef<HTMLButtonElement>(null);
+  return (
+    <div
+      className="relative"
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !open) return;
+        setOpen(false);
+        toggle.current?.focus();
+      }}
+    >
+      <button
+        ref={toggle}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen(!open)}
+        className={SECONDARY_BUTTON}
+      >
+        More
+      </button>
+      {open && (
+        <div
+          id={id}
+          role="menu"
+          className="absolute left-0 z-20 mt-2 min-w-72 rounded-chip border-2 border-ink bg-white p-1"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDismissAll();
+            }}
+            className="flex min-h-11 w-full items-center rounded-chip px-3 text-left text-secondary font-semibold hover:bg-lane-grey"
+          >
+            Dismiss all AWS-managed ({count})
+          </button>
+        </div>
       )}
     </div>
   );

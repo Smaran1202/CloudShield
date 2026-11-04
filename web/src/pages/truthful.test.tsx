@@ -537,13 +537,14 @@ describe("Findings: dismissed filter", () => {
   });
   const routes = { "GET /api/findings": [own, gone] };
 
-  it("keeps dismissed findings out of the default list and the Open count", async () => {
+  it("keeps dismissed findings out of the Open list and its count", async () => {
     renderApp("/findings?lane=open", routes);
 
     await screen.findByRole("table");
 
     expect(screen.queryByText("Hidden for now")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Open\s*1$/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("Status")).toHaveValue("open");
+    expect(screen.getByText("Showing 1 of 2 findings")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Dismissed\s*1$/ })).toBeInTheDocument();
   });
 

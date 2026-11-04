@@ -60,7 +60,7 @@ describe("Findings: the default list is Fix now and Next", () => {
       "Wildcard policy",
     ]);
     expect(screen.getByText(/Showing 3 of 8 findings/)).toBeInTheDocument();
-    expect(chip("Fix now and Next", 3)).toHaveAttribute("aria-pressed", "true");
+    expect(chip("To do", 3)).toHaveAttribute("aria-pressed", "true");
   });
 
   it("groups Later by check: one collapsed row for each check, with its resources", async () => {
@@ -116,11 +116,11 @@ describe("Findings: the default list is Fix now and Next", () => {
     expect(shown()).toBe(3);
     await user.click(chip("Later", 3));
     expect(shown()).toBe(3);
-    await user.click(chip("Open", 7));
+    await user.selectOptions(screen.getByLabelText("Status"), "open");
     expect(shown()).toBe(7);
     await user.click(chip("Done", 1));
     expect(shown()).toBe(1);
-    await user.click(chip("All", 8));
+    await user.selectOptions(screen.getByLabelText("Status"), "all");
     expect(shown()).toBe(8);
   });
 
@@ -208,9 +208,8 @@ describe("Bulk dismissal of AWS-managed findings", () => {
 
   async function open(extra: Record<string, unknown> = {}): Promise<User> {
     const user = renderApp("/findings?lane=open", { ...base, ...extra });
-    await user.click(
-      await screen.findByRole("button", { name: /^Dismiss all AWS-managed/ }),
-    );
+    await user.click(await screen.findByRole("button", { name: "More" }));
+    await user.click(screen.getByRole("menuitem", { name: /^Dismiss all AWS-managed/ }));
     return user;
   }
 
@@ -218,14 +217,16 @@ describe("Bulk dismissal of AWS-managed findings", () => {
     renderApp("/findings?lane=open", { ...base, "GET /api/findings": [A] });
     await screen.findByRole("table");
 
-    expect(screen.queryByRole("button", { name: /Dismiss all AWS-managed/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
   });
 
   it("counts only open findings that were suggested, not ones already dismissed", async () => {
-    renderApp("/findings?lane=open", base);
+    const user = renderApp("/findings?lane=open", base);
+
+    await user.click(await screen.findByRole("button", { name: "More" }));
 
     expect(
-      await screen.findByRole("button", { name: "Dismiss all AWS-managed (2)" }),
+      screen.getByRole("menuitem", { name: "Dismiss all AWS-managed (2)" }),
     ).toBeInTheDocument();
   });
 
@@ -363,7 +364,8 @@ describe("Bulk dismissal of AWS-managed findings", () => {
 
     await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Dismiss all AWS-managed/ }));
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(screen.getByRole("menuitem", { name: /^Dismiss all AWS-managed/ }));
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();

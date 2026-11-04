@@ -21,7 +21,7 @@ test.beforeEach(async ({ request }) => {
 });
 
 test.describe("Findings list", () => {
-  test("the lane chips show counts that match the list they open", async ({
+  test("the tabs show counts that match the list they open", async ({
     page,
     request,
   }) => {
@@ -30,14 +30,31 @@ test.describe("Findings list", () => {
     const chips = page.getByRole("group", { name: "Lane" }).getByRole("button");
     await expect(chips.first()).toBeVisible();
     const total = await chips.count();
-    expect(total).toBe(8);
+    // A tab with nothing in it is left out.
+    const expected = [
+      ["To do", findings.filter(inFocus).length],
+      [
+        "Later",
+        findings.filter(
+          (f) =>
+            isActive(f) && f.risk_score !== null && f.risk_score < LANE_THRESHOLDS.next,
+        ).length,
+      ],
+      ["Done", findings.filter((f) => f.status === "RESOLVED").length],
+      [
+        "Dismissed",
+        findings.filter((f) => f.status === "OPEN" && f.dismissed && !f.merged_into)
+          .length,
+      ],
+    ].filter(([, count]) => count !== 0);
+    expect(total).toBe(expected.length);
 
-    expect(trailingNumber(await chips.nth(0).innerText()), "Fix now and Next chip").toBe(
-      findings.filter(inFocus).length,
-    );
-    expect(trailingNumber(await chips.nth(1).innerText()), "Open chip").toBe(
-      findings.filter(isActive).length,
-    );
+    for (let index = 0; index < total; index++) {
+      const [name, count] = expected[index];
+      const text = await chips.nth(index).innerText();
+      expect(text, "tab name").toContain(String(name));
+      expect(trailingNumber(text), `${name} tab`).toBe(count);
+    }
 
     for (let index = 0; index < total; index++) {
       const chip = chips.nth(index);
@@ -60,6 +77,7 @@ test.describe("Findings list", () => {
     const severities = [...new Set(open.map((f) => f.severity))];
     test.skip(severities.length === 0, "No finding is open.");
     await page.goto("/findings?lane=open");
+    await openFilters(page);
 
     for (const severity of severities) {
       const expected = open.filter((f) => f.severity === severity).length;
@@ -77,6 +95,7 @@ test.describe("Findings list", () => {
   }) => {
     const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
     await page.goto("/findings?lane=open");
+    await openFilters(page);
 
     for (const source of ["cloudshield", "prowler"]) {
       const expected = open.filter((f) => f.source === source).length;
@@ -95,6 +114,7 @@ test.describe("Findings list", () => {
     const open = (await getJson<FindingOut[]>(request, "/api/findings")).filter(isActive);
     const info = open.filter((f) => f.severity === "INFO").length;
     await page.goto("/findings?lane=open");
+    await openFilters(page);
 
     await select(page, "Informational").selectOption("hide");
     await showing(page, open.length - info);
@@ -151,12 +171,18 @@ test.describe("Findings list", () => {
   });
 });
 
-// The label holds the chosen option too, so it is found by what it starts with.
+// The label holds the chosen option too, so it is found by what it starts with. The filters are
+// in a fold that starts closed unless the link already sets one.
 const select = (page: Page, label: string) =>
   page
     .locator("label")
     .filter({ hasText: new RegExp(`^${label}`) })
     .locator("select");
+
+async function openFilters(page: Page) {
+  const fold = page.getByRole("button", { name: /^Filters/ });
+  if ((await fold.getAttribute("aria-expanded")) === "false") await fold.click();
+}
 
 const TABS = ["Summary", "Evidence", "Risk", "Fix"];
 
