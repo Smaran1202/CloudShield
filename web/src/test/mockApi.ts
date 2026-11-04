@@ -11,6 +11,7 @@ export interface Call {
   headers: Record<string, string>;
   // True when the request body was a file, which is not read here.
   bodyIsFile: boolean;
+  credentials: RequestCredentials | undefined;
 }
 
 type Answer = unknown;
@@ -76,6 +77,7 @@ export function mockApi(routes: Record<string, Handler>) {
         body,
         headers,
         bodyIsFile,
+        credentials: init?.credentials,
       };
       calls.push(call);
       const key = `${method} ${url.pathname}`;

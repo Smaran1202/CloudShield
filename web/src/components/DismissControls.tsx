@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, type FindingOut } from "../api";
+import { useLock } from "../auth";
 import { formatDate } from "../format";
 import { messageOf } from "../useAsync";
 import { DismissDialog } from "./DismissDialog";
@@ -19,6 +20,7 @@ export function DismissControls({
 }) {
   const [kind, setKind] = useState<Kind | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const lock = useLock();
 
   async function undo() {
     setError(null);
@@ -43,7 +45,13 @@ export function DismissControls({
             .
           </p>
           <p className="mt-1">Reason: {finding.disposition_reason}</p>
-          <button type="button" className={`mt-3 ${SECONDARY_BUTTON}`} onClick={undo}>
+          <button
+            type="button"
+            className={`mt-3 ${SECONDARY_BUTTON}`}
+            onClick={undo}
+            disabled={lock.disabled}
+            title={lock.title}
+          >
             Undo dismissal
           </button>
         </div>
@@ -61,6 +69,8 @@ export function DismissControls({
             type="button"
             className={SECONDARY_BUTTON}
             onClick={() => setKind("not_applicable")}
+            disabled={lock.disabled}
+            title={lock.title}
           >
             Review and dismiss
           </button>
@@ -71,6 +81,8 @@ export function DismissControls({
           type="button"
           className={SECONDARY_BUTTON}
           onClick={() => setKind("accepted")}
+          disabled={lock.disabled}
+          title={lock.title}
         >
           Dismiss
         </button>

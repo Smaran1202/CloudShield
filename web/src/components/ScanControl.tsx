@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type ScanOut } from "../api";
+import { useLock } from "../auth";
 import { useScans } from "../ScanContext";
 import { useAsync } from "../useAsync";
 import type { Runner } from "../useScanRunner";
@@ -139,6 +140,7 @@ export function RunScanButton({
   const running = runner.phase === "running";
   const [open, setOpen] = useState(false);
   const { openImport } = useScans();
+  const lock = useLock();
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -169,7 +171,8 @@ export function RunScanButton({
       <button
         type="button"
         onClick={() => pick(false)}
-        disabled={running}
+        disabled={running || lock.disabled}
+        title={lock.title}
         className={`${SPLIT} rounded-l-chip px-6`}
       >
         {running && <Spinner />}
@@ -180,7 +183,8 @@ export function RunScanButton({
         aria-label="More ways to scan"
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={running}
+        disabled={running || lock.disabled}
+        title={lock.title}
         onClick={() => setOpen(!open)}
         className={`${SPLIT} rounded-r-chip border-l-2 border-paper px-3`}
       >

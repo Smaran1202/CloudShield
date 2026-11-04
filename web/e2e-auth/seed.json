@@ -1,0 +1,31 @@
+[
+  {
+    "message": "Synthetic entry for the login test. It is not from any real account.",
+    "metadata": {
+      "event_code": "synthetic_login_test_check",
+      "version": "1.5.0",
+      "product": { "name": "Synthetic", "version": "0.0.0" }
+    },
+    "severity": "High",
+    "severity_id": 4,
+    "status": "New",
+    "status_code": "FAIL",
+    "status_detail": "Synthetic bucket does not block public access.",
+    "finding_info": {
+      "uid": "synthetic-login-test",
+      "title": "Synthetic check",
+      "desc": "A made-up check used only by the login test."
+    },
+    "cloud": { "account": { "uid": "123456789012" }, "region": "us-east-1" },
+    "remediation": { "desc": "There is nothing to fix.", "references": [] },
+    "risk_details": "None. This is test data.",
+    "resources": [
+      {
+        "uid": "arn:aws:s3:::synthetic-login-test-bucket",
+        "region": "us-east-1",
+        "group": { "name": "s3" },
+        "type": "AwsS3Bucket"
+      }
+    ]
+  }
+]

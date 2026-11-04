@@ -46,7 +46,11 @@ export default defineConfig({
       url: `${API}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { DATABASE_URL: `sqlite:///${db}`, FRONTEND_ORIGIN: WEB },
+      env: {
+        DATABASE_URL: `sqlite:///${db}`,
+        FRONTEND_ORIGIN: WEB,
+        AUTH_ENABLED: "false",
+      },
     },
     {
       command: `npm run dev -- --host localhost --port ${webPort} --strictPort`,

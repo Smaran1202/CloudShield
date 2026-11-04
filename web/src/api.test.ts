@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { api, ApiError, messageFromDetail } from "./api";
+import { api, ApiError, messageFromDetail, setUnauthorizedHandler } from "./api";
 
 describe("messageFromDetail", () => {
   it("uses FastAPI's detail text", () => {
@@ -73,12 +73,12 @@ describe("api", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "http://localhost:8000/api/findings/F-1%2Fodd%20id",
-      undefined,
+      { credentials: "include" },
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "http://localhost:8000/api/findings/F-2/fix?refresh=true",
-      { method: "POST" },
+      { method: "POST", credentials: "include" },
     );
   });
 
@@ -90,6 +90,44 @@ describe("api", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("http://localhost:8000/api/scans", {
       method: "POST",
+      credentials: "include",
     });
+  });
+
+  it("sends the session cookie with every request, to the other origin the API is on", async () => {
+    const fetchMock = vi.fn(async () => new Response("[]", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.scans();
+    await api.dismiss("F-1", {
+      disposition: "accepted",
+      disposition_reason: "A reason that is long enough.",
+      disposition_until: null,
+    });
+    await api.logout();
+
+    for (const [, init] of fetchMock.mock.calls as unknown as [string, RequestInit][])
+      expect(init.credentials).toBe("include");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("calls the unauthorized handler on a 401, but not for a wrong password", async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ detail: "Log in first." }), { status: 401 }),
+      ),
+    );
+
+    await api.scans().catch(() => null);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const wrong = await api.login("owner", "nope").catch((e: unknown) => e);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect((wrong as ApiError).status).toBe(401);
+    setUnauthorizedHandler(null);
   });
 });

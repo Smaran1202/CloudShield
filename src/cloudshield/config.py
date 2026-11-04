@@ -35,6 +35,19 @@ class Settings(BaseSettings):
     docker_command: str = "docker"
     cloudshield_data_dir: str = "./data"
     keep_raw_output: bool = False
+    # A simple login lock (docs/auth.md). Off by default, so local use is unchanged.
+    auth_enabled: bool = False
+    # Made with: python -m cloudshield.auth hash-password. The viewer password is optional.
+    owner_password_hash: str | None = None
+    viewer_password_hash: str | None = None
+    # Signs the session cookie. Made with: python -m cloudshield.auth secret.
+    session_secret: str | None = None
+    session_hours: int = 8
+    # Must be true when the dashboard is served over HTTPS.
+    cookie_secure: bool = False
+    # Only behind a reverse proxy that you run: use the last X-Forwarded-For address as the
+    # client address for the login rate limit.
+    trust_forwarded_for: bool = False
 
 
 def load_env_file() -> None:

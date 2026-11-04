@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { api } from "../api";
+import { useAuth } from "../auth";
 import { config } from "../config";
 import { scanChipText } from "../format";
 import { ScanProvider, useScans } from "../ScanContext";
 import { RunScanButton, ScanBar, ScanStatusLine } from "./ScanControl";
-import { Container } from "./ui";
+import { Container, SECONDARY_BUTTON } from "./ui";
 
 type Health =
   { state: "checking" } | { state: "online"; version: string } | { state: "offline" };
@@ -92,6 +93,35 @@ function LastScanChip() {
   );
 }
 
+// Who is logged in, and the way out. Only shown when the login is turned on.
+function Account() {
+  const { enabled, role, logOut } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  if (!enabled) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <span
+        data-testid="role-badge"
+        className="inline-flex min-h-11 items-center rounded-chip border-2 border-ink bg-white px-3 font-mono text-label"
+      >
+        {role === "owner" ? "Owner" : "Viewer"}
+      </span>
+      <button
+        type="button"
+        className={SECONDARY_BUTTON}
+        onClick={() => logOut().catch(() => setError("Could not log out."))}
+      >
+        Log out
+      </button>
+      {error && (
+        <span role="alert" className="text-secondary font-semibold text-red">
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Header() {
   const { runner } = useScans();
   return (
@@ -125,6 +155,7 @@ function Header() {
           <ApiStatus />
           <LastScanChip />
           <RunScanButton runner={runner} />
+          <Account />
         </div>
       </Container>
       {runner.phase === "running" && <ScanBar />}

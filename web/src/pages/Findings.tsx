@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, SEVERITIES, type FindingOut } from "../api";
+import { useLock } from "../auth";
 import { BulkDismissDialog } from "../components/BulkDismissDialog";
 import { Icon } from "../components/Icon";
 import {
@@ -475,6 +476,7 @@ function MoreMenu({ count, onDismissAll }: { count: number; onDismissAll: () => 
   const [open, setOpen] = useState(false);
   const id = useId();
   const toggle = useRef<HTMLButtonElement>(null);
+  const lock = useLock();
   return (
     <div
       className="relative"
@@ -491,6 +493,8 @@ function MoreMenu({ count, onDismissAll }: { count: number; onDismissAll: () => 
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen(!open)}
+        disabled={lock.disabled}
+        title={lock.title}
         className={SECONDARY_BUTTON}
       >
         More

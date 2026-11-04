@@ -5,6 +5,7 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
+    Field,
     StringConstraints,
     field_validator,
 )
@@ -319,3 +320,16 @@ class FixOut(BaseModel):
 class FindingDetailOut(FindingOut):
     # The stored state of the resource the finding is about.
     resource: ResourceOut | None = None
+
+
+class LoginIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["owner", "viewer"]
+    password: str = Field(min_length=1, max_length=256)
+
+
+class MeOut(BaseModel):
+    # False when the login is not turned on. Then every visitor is the owner.
+    auth_enabled: bool
+    role: Literal["owner", "viewer"]

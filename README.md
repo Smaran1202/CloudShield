@@ -127,6 +127,16 @@ cd web
 npm test
 ```
 
+## Login (optional)
+
+A simple lock for showing the project, off by default. Turn it on with `AUTH_ENABLED=true` in
+`.env`, with a password hash for the owner (and optionally one for a viewer, who can only look) and
+a random `SESSION_SECRET`. Make them with `python -m cloudshield.auth hash-password` and
+`python -m cloudshield.auth secret`. It is one shared password for each role, with no sign-up, no
+per-user data and no password reset. It is not a multi-user system, and a server that holds your AWS
+credentials should still not be exposed to the internet. Set `COOKIE_SECURE=true` behind HTTPS, and
+use `localhost` for both the dashboard and the API. See `docs/auth.md`.
+
 ## Import Prowler findings
 
 Run Prowler yourself with JSON-OCSF output, then import the file:
@@ -180,6 +190,13 @@ npm test
 ```
 
 Continuous integration also runs `ruff check` and `ruff format --check` on the Python code.
+
+### Browser test of the login
+
+`npm run e2e:auth` in `web/` starts its own API (port 8012, login on, made-up passwords, a
+throwaway database with one made-up finding) and dashboard (port 5184), and logs in as a viewer. It
+checks that the action controls are disabled and that nothing but the login and logout is written.
+The two suites below start their API with `AUTH_ENABLED=false`.
 
 ### Browser tests (read-only)
 

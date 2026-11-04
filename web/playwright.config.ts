@@ -27,6 +27,8 @@ export default defineConfig({
       url: `${API}/api/health`,
       reuseExistingServer: true,
       timeout: 60_000,
+      // These tests read data with no login. A login is tested in e2e-auth/.
+      env: { AUTH_ENABLED: "false" },
     },
     {
       command: "npm run dev -- --host localhost --port 5173 --strictPort",

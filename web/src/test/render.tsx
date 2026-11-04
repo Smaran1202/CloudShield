@@ -7,6 +7,7 @@ import { mockApi } from "./mockApi";
 // The header asks for the scans on every page, so there is always an answer for it.
 export const BASE = {
   "GET /api/health": { status: "ok", version: "1.2.3" },
+  "GET /api/auth/me": { auth_enabled: false, role: "owner" },
   "GET /api/scans": [],
   "GET /api/imports": [],
   "GET /api/resources/imported": [],

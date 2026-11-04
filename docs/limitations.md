@@ -113,6 +113,21 @@
 - The hourly AI limit is counted in the memory of one server process and starts again when the
   server restarts.
 
+## Login
+
+- The login is a lock for showing the project, not a multi-user system. There is one password for
+  the owner and an optional one for a viewer, with no sign-up, no per-user data, no audit of who
+  did what and no password reset. It is off unless `AUTH_ENABLED=true`. See `docs/auth.md`.
+- Logging out clears the cookie in that browser only. The server keeps no list of sessions, so a
+  copied token stays valid until it ends. Changing `SESSION_SECRET` ends every session.
+- The limit on wrong passwords is kept in the memory of one server process, for each client
+  address. `X-Forwarded-For` is ignored unless `TRUST_FORWARDED_FOR` is true.
+- Over plain HTTP the password and the cookie can be read on the network. Behind HTTPS set
+  `COOKIE_SECURE=true`. A server that holds AWS credentials should still not be exposed to the
+  internet.
+- The cookie is `SameSite=Strict`, so the dashboard and the API must be on the same site: use
+  `localhost` for both, not `127.0.0.1` for one of them.
+
 ## Imported findings (Prowler)
 
 - Imported findings come from an output file that you produce. CloudShield did not collect the

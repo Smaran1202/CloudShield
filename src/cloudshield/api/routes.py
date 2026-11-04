@@ -28,6 +28,7 @@ from cloudshield.api.schemas import (
     ScoreBreakdown,
     SuggestedNotApplicable,
 )
+from cloudshield.auth.routes import require_session
 from cloudshield.db import store
 from cloudshield.db.models import (
     ACCOUNT_ID,
@@ -58,7 +59,7 @@ from cloudshield.imports.upload import ImportBusy, import_upload
 from cloudshield.risk.scoring import is_mitigated, score_breakdown
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api", dependencies=[Depends(require_session)])
 
 
 def get_session(request: Request):

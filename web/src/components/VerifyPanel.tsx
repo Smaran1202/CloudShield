@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { useLock } from "../auth";
 import { useAsync } from "../useAsync";
 import type { Verify } from "../useVerify";
 import { useScans } from "../ScanContext";
@@ -16,6 +17,7 @@ export function VerifyPanel({
 }) {
   const { runner } = useScans();
   const { state, start } = verify;
+  const lock = useLock();
 
   if (state.phase === "resolved") {
     return (
@@ -42,6 +44,8 @@ export function VerifyPanel({
         <button
           type="button"
           onClick={() => start()}
+          disabled={lock.disabled}
+          title={lock.title}
           className={`mt-4 ${SECONDARY_BUTTON}`}
         >
           Rescan to verify
@@ -62,6 +66,8 @@ export function VerifyPanel({
         <button
           type="button"
           onClick={() => start()}
+          disabled={lock.disabled}
+          title={lock.title}
           className={`mt-4 ${SECONDARY_BUTTON}`}
         >
           Rescan to verify
@@ -92,7 +98,8 @@ export function VerifyPanel({
       <button
         type="button"
         onClick={() => start()}
-        disabled={scanning}
+        disabled={scanning || lock.disabled}
+        title={lock.title}
         className={`mt-4 ${DARK_BUTTON}`}
       >
         {scanning ? "Scanning..." : "Rescan to verify"}
@@ -112,6 +119,7 @@ export function ImportedVerifyPanel({
 }) {
   const { runner } = useScans();
   const { state, start } = verify;
+  const lock = useLock();
   const [status] = useAsync(() => api.extendedStatus());
   const scanning = state.phase === "scanning";
   const ready = status.status === "success" && status.data.available;
@@ -178,7 +186,8 @@ export function ImportedVerifyPanel({
       <button
         type="button"
         onClick={() => start(true)}
-        disabled={scanning || !ready}
+        disabled={scanning || !ready || lock.disabled}
+        title={lock.title}
         className={`mt-4 ${DARK_BUTTON}`}
       >
         {scanning ? "Scanning..." : "Run full scan to verify"}

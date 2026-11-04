@@ -1,5 +1,5 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": { "types": ["node", "vite/client"] },
-  "include": ["e2e", "e2e-actions", "playwright.config.ts", "browser.ts"]
+  "include": ["e2e", "e2e-actions", "e2e-auth", "playwright.config.ts", "browser.ts"]
 }

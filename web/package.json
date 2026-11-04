@@ -9,6 +9,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "e2e:actions": "node e2e-actions/run.mjs",
+    "e2e:auth": "node e2e-auth/run.mjs",
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

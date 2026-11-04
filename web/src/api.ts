@@ -274,6 +274,14 @@ export interface HealthOut {
   version: string;
 }
 
+export type Role = "owner" | "viewer";
+
+export interface MeOut {
+  // False when the login is not turned on. Then every visitor is the owner.
+  auth_enabled: boolean;
+  role: Role;
+}
+
 export class ApiError extends Error {
   status: number | null;
 
@@ -295,13 +303,24 @@ export function messageFromDetail(body: unknown, status: number): string {
   return `The API answered with HTTP ${status}.`;
 }
 
+// Called when the API says there is no session, so the app can send the person to the login page.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  onUnauthorized = handler;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, init);
+    // The dashboard and the API are different origins, so the session cookie is only sent when
+    // every request asks for it.
+    response = await fetch(`${API_URL}${path}`, { ...init, credentials: "include" });
   } catch {
     throw new ApiError(`Cannot reach the API at ${API_URL}. Is it running?`, null);
   }
+  // A wrong password on the login page is also a 401, and must not send the person back there.
+  if (response.status === 401 && path !== "/api/auth/login") onUnauthorized?.();
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok)
     throw new ApiError(messageFromDetail(body, response.status), response.status);
@@ -310,6 +329,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<HealthOut>("/api/health"),
+  me: () => request<MeOut>("/api/auth/me"),
+  login: (role: Role, password: string) =>
+    request<MeOut>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, password }),
+    }),
+  logout: () => request<null>("/api/auth/logout", { method: "POST" }),
   scans: () => request<ScanOut[]>("/api/scans"),
   scan: (id: number) => request<ScanOut>(`/api/scans/${id}`),
   startScan: (extended = false) =>
