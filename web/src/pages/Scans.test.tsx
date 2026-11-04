@@ -1,5 +1,5 @@
 import { screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatDate } from "../format";
 import { scan } from "../test/factories";
 import { fail } from "../test/mockApi";
@@ -14,6 +14,8 @@ const oneError = {
 };
 
 describe("Scans", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("shows loading while scans are fetched", async () => {
     renderApp("/scans", { "GET /api/scans": never });
 
@@ -81,6 +83,7 @@ describe("Scans", () => {
   });
 
   it("shows the start as an unambiguous date with a relative time under it", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(new Date("2026-10-05T08:42:00Z").getTime());
     renderApp("/scans", {
       "GET /api/scans": [scan({ started_at: "2026-10-05T04:42:00Z" })],
     });
@@ -90,7 +93,7 @@ describe("Scans", () => {
 
     expect(started).toHaveTextContent(formatDate("2026-10-05T04:42:00Z"));
     expect(started.textContent).toMatch(/\d{1,2} Oct 2026/);
-    expect(started.textContent).toMatch(/ago|just now|yesterday/);
+    expect(started).toHaveTextContent("4 hours ago");
   });
 
   it("shows the progress text of a scan that is queued or running", async () => {
