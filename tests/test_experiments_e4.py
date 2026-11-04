@@ -29,8 +29,16 @@ GOOD_WORKFLOW = (
     "name: x\non:\n  pull_request:\n"
     "jobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo hi\n"
 )
-GOOD_BUCKET = "Resources:\n  B:\n    Type: AWS::S3::Bucket\n    Properties:\n      BucketName: b\n"
-BROKEN_BUCKET = "Resources:\n  B:\n    Type: AWS::S3::Bucket\n    Properties:\n      NoSuch: 1\n"
+# S3 allows 3 to 63 characters, so a short name would fail for the wrong reason.
+BUCKET_NAME = "cloudshield-test-bucket"
+GOOD_BUCKET = (
+    "Resources:\n  B:\n    Type: AWS::S3::Bucket\n    Properties:\n"
+    f"      BucketName: {BUCKET_NAME}\n"
+)
+BROKEN_BUCKET = (
+    "Resources:\n  B:\n    Type: AWS::S3::Bucket\n    Properties:\n"
+    f"      BucketName: {BUCKET_NAME}\n      NoSuch: 1\n"
+)
 
 
 def file_of(content) -> list[dict]:
@@ -146,18 +154,23 @@ def test_validate_reports_a_rejected_patch_as_no():
 
 @pytest.mark.skipif(not cfn_lint_installed(), reason="cfn-lint is not installed")
 def test_cfn_lint_accepts_a_good_template_and_rejects_a_broken_one():
+    error = check_cloudformation(BROKEN_BUCKET)
+
     assert check_cloudformation(GOOD_BUCKET) == ""
-    assert check_cloudformation(BROKEN_BUCKET) != ""
+    assert "NoSuch" in error
 
 
 @pytest.mark.skipif(shutil.which("terraform") is None, reason="terraform is not installed")
 def test_terraform_validate_rejects_a_resource_with_an_unknown_argument(tmp_path):
     good = (
-        'resource "aws_s3_bucket_versioning" "b" {\n  bucket = "b"\n'
+        'resource "aws_s3_bucket_versioning" "b" {\n'
+        f'  bucket = "{BUCKET_NAME}"\n'
         '  versioning_configuration {\n    status = "Enabled"\n  }\n}\n'
     )
     broken = (
-        'resource "aws_s3_bucket_versioning" "b" {\n  bucket = "b"\n  no_such_argument = 1\n}\n'
+        'resource "aws_s3_bucket_versioning" "b" {\n'
+        f'  bucket = "{BUCKET_NAME}"\n'
+        "  no_such_argument = 1\n}\n"
     )
 
     prepare_terraform(tmp_path)
