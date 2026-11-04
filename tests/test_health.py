@@ -1,4 +1,3 @@
-
 from fastapi.testclient import TestClient
 
 from cloudshield.api.app import create_app
