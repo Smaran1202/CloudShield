@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { api } from "../api";
-import { useLock } from "../auth";
 import { durationText, formatDate, formatRelative } from "../format";
 import { shortResource } from "../lanes";
 import { useScans, useRefreshWhenScanEnds } from "../ScanContext";
@@ -109,7 +108,6 @@ const count = (value: number | null) => (value === null ? "-" : value);
 export function ImportHistory() {
   const [state, reload] = useAsync(() => api.imports());
   const { openImport } = useScans();
-  const lock = useLock();
   useRefreshWhenScanEnds(reload);
   return (
     <section aria-label="Imports" className="mt-16">
@@ -117,13 +115,7 @@ export function ImportHistory() {
       <p className="mt-1 mb-4 text-secondary text-dim">
         Results files you imported from another scanner.
       </p>
-      <button
-        type="button"
-        className={`${SECONDARY_BUTTON} mb-6`}
-        onClick={openImport}
-        disabled={lock.disabled}
-        title={lock.title}
-      >
+      <button type="button" className={`${SECONDARY_BUTTON} mb-6`} onClick={openImport}>
         Import a results file
       </button>
       <AsyncView state={state} onRetry={reload} label="Loading imports" shape="table">

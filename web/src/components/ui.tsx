@@ -12,8 +12,7 @@ import { formatDate } from "../format";
 import type { AsyncState } from "../useAsync";
 import { Icon, type IconName } from "./Icon";
 
-const CHIP =
-  "inline-flex items-center rounded-chip px-3 py-1 text-secondary font-semibold";
+const CHIP = "inline-flex items-center rounded-chip px-2 py-1 text-label font-semibold";
 
 // Every page, and the header, use this one container.
 export const CONTAINER = "mx-auto w-full max-w-[1440px] px-[clamp(20px,4vw,64px)]";
@@ -36,7 +35,7 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={`rounded-lane border-2 border-ink bg-white p-6 ${className}`}>
+    <section className={`rounded-lane border border-ink bg-white p-6 ${className}`}>
       {children}
     </section>
   );
@@ -44,8 +43,8 @@ export function Card({
 
 export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
-    <header className="rise mb-12">
-      <h1 className="font-display text-page leading-[0.95] font-extrabold tracking-[-0.045em]">
+    <header className="rise mb-8">
+      <h1 className="font-display text-page leading-tight font-bold tracking-[-0.02em]">
         {children}
       </h1>
       {sub && <p className="mt-3 text-body text-dim">{sub}</p>}
@@ -54,9 +53,7 @@ export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactN
 }
 
 export function SectionTitle({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="font-display text-h3 font-extrabold tracking-[-0.02em]">{children}</h2>
-  );
+  return <h2 className="text-title font-bold tracking-[-0.01em]">{children}</h2>;
 }
 
 const SEVERITY_CHIP: Record<Severity, string> = {
@@ -150,7 +147,7 @@ const GUARDRAIL_STATUS: Record<
   needs_org_admin: {
     label: "Needs organization admin",
     icon: "shield",
-    style: "border-2 border-ink bg-white text-ink",
+    style: "border border-ink bg-white text-ink",
   },
 };
 
@@ -170,7 +167,7 @@ export function SourceBadge({ source }: { source: FindingSource }) {
   if (source !== "prowler") return null;
   return (
     <span
-      className={`${CHIP} gap-2 border-2 border-ink bg-white text-ink`}
+      className={`${CHIP} gap-2 border border-ink bg-white text-ink`}
       title="Imported from an external scanner"
       data-source={source}
     >
@@ -238,7 +235,7 @@ export function FindingFlags({ finding }: { finding: FindingOut }) {
         </span>
       )}
       {finding.dismissed && (
-        <span className={`${CHIP} gap-2 border-2 border-dashed border-dash text-dim`}>
+        <span className={`${CHIP} gap-2 border border-dashed border-dash text-dim`}>
           <Icon name="dismiss" size={16} />
           Dismissed
         </span>
@@ -270,7 +267,7 @@ export function Tag({ children }: { children: string }) {
   return (
     <span
       title={children}
-      className="inline-block max-w-full truncate rounded-[4px] border-[1.5px] border-current px-2 py-1 align-bottom font-mono text-tag"
+      className="inline-block max-w-full truncate rounded-[4px] border border-current px-2 py-1 align-bottom font-mono text-tag"
     >
       {children}
     </span>
@@ -348,14 +345,16 @@ export function Loading({
   );
 }
 
+// Buttons: hover and press change the fill, focus is the 2px ring from tokens.css, and a disabled
+// button is flat grey with dim text, so it never relies on opacity alone.
 export const PRIMARY_BUTTON =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-chip bg-ink px-6 text-secondary font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70";
+  "btn inline-flex min-h-10 items-center justify-center gap-2 rounded-chip bg-ink px-4 text-secondary font-semibold text-white hover:bg-ink-hover active:bg-black disabled:cursor-not-allowed disabled:bg-lane-grey disabled:text-dim";
 
 export const SECONDARY_BUTTON =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-chip border-2 border-ink bg-white px-4 text-secondary font-semibold text-ink hover:bg-lane-grey disabled:cursor-not-allowed disabled:opacity-60";
+  "btn inline-flex min-h-10 items-center justify-center gap-2 rounded-chip border border-ink bg-white px-4 text-secondary font-semibold text-ink hover:bg-pill-hover active:bg-pill-press disabled:cursor-not-allowed disabled:border-dash disabled:bg-lane-grey disabled:text-dim";
 
 export const FIELD =
-  "h-11 rounded-chip border-[1.5px] border-ink bg-white px-3 font-body text-secondary text-ink placeholder:text-dim";
+  "h-11 rounded-chip border border-ink bg-white px-3 font-body text-secondary text-ink placeholder:text-dim";
 
 // A native <select> with its own look and a chevron icon over it.
 export function SelectField({
@@ -404,7 +403,7 @@ export function ErrorBox({
   return (
     <div
       role="alert"
-      className="rounded-lane border-2 border-red bg-chip-high-bg p-6 text-secondary text-chip-high-text"
+      className="rounded-lane border border-red bg-chip-high-bg p-6 text-secondary text-chip-high-text"
     >
       <p className="font-semibold">Something went wrong</p>
       <p className="mt-1 break-words">{message}</p>
@@ -419,8 +418,8 @@ export function ErrorBox({
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-lane border-2 border-dashed border-dash p-8 text-center">
-      <p className="font-display text-title font-bold">{title}</p>
+    <div className="rounded-lane border border-dashed border-dash p-8 text-center">
+      <p className="text-title font-bold">{title}</p>
       {children && <div className="mt-2 text-secondary text-dim">{children}</div>}
     </div>
   );

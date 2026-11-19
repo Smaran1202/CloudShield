@@ -1,184 +1,224 @@
 # CloudShield
 
-CloudShield is an AWS security platform. It discovers resources with read-only AWS access,
-checks them against rules to produce findings, adjusts risk scores using context, finds attack
-paths, and shows the results in a React dashboard. This repository currently contains the
-foundation: a FastAPI service with a health endpoint and a web page that calls it.
+CloudShield is a fix-first, evidence-first AWS posture tool, built from scratch as a student
+capstone. It reads your account with read-only access, checks what it finds against six rules,
+scores each finding using its context, shows the evidence behind the score, and says what to fix
+first. For each finding it writes a fix as text that you review and apply yourself. It never
+changes your AWS account. Results from Prowler can be imported and are shown beside CloudShield's
+own findings, labelled as imported.
 
-## Setup
+## The loop
 
-Requires Python 3.12 and Node 20 or newer.
+1. **Scan.** Read the account with read-only AWS calls.
+2. **Rank.** Score every finding from its severity and context, and sort them into Fix now, Next
+   and Later.
+3. **Fix.** Open a finding, read the evidence, and take the patch, the checks to make first and the
+   guardrail that stops it coming back. You apply it.
+4. **Verify.** Scan again. A finding is shown as resolved only after a rescan (or a newer import)
+   confirms it.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    aws[(AWS account<br/>read-only)] --> scanner[Scanner]
+    scanner --> rules[Rules]
+    rules --> risk[Risk scores<br/>and evidence]
+    risk --> db[(Database)]
+    prowler[Prowler results<br/>file or run] --> importer[Importer]
+    importer --> db
+    db --> fixes[Fix generation<br/>text only]
+    fixes --> guardrails[Guardrails]
+    db --> api[API]
+    fixes --> api
+    guardrails --> api
+    api --> dashboard[Dashboard]
+```
+
+## Quick start
+
+You need Python 3.12 and Node 20 or newer. All commands are PowerShell, from the repository root.
+
+### Backend
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-
-cd web
-npm ci
-cd ..
-```
-
-Settings come from environment variables. The names are listed in `.env.example`. All of them
-have defaults or are optional. The simplest way to set them is a `.env` file in the folder you run
-the commands from:
-
-```powershell
 Copy-Item .env.example .env
-```
-
-Then fill in the values you need in `.env`. The API, `python -m cloudshield.scanner` and
-`python -m cloudshield.fixes` read it when they start. A variable that is already set in your shell
-wins over the file. `.env` is ignored by git, so keys in it are never committed. To set one for the
-current PowerShell session instead:
-
-```powershell
-$env:FRONTEND_ORIGIN = "http://localhost:5173"
-```
-
-The web app reads `VITE_API_URL` (see `web/.env.example`). It defaults to `http://localhost:8000`.
-
-## Run
-
-Create or update the database (SQLite by default, in `cloudshield.db`). Run this once, and again
-after pulling changes that add migrations:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
 python -m alembic upgrade head
 ```
 
-To use PostgreSQL, set `DATABASE_URL` and install a driver such as `psycopg` first.
-
-In one terminal, start the API. A scan uses the AWS profile named in `AWS_PROFILE` and the region
-in `AWS_REGION`, or the regions sent with the scan request:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-$env:AWS_PROFILE = "your-profile"
-$env:AWS_REGION = "us-east-1"
-python -m uvicorn cloudshield.api.app:create_app --factory --host 127.0.0.1 --port 8000
-```
-
-> **Warning: run the server only on localhost.** There is no login yet. Never use
-> `--host 0.0.0.0` and never expose the port. Anyone who can reach it can start scans with the
-> server's AWS credentials, read all findings, upload files and dismiss findings.
-
-Start a scan and read the results:
+`.env.example` lists every setting with a one-line explanation. Fill in the ones you need in `.env`.
+A variable already set in your shell wins over the file. The scan uses the AWS profile named in
+`AWS_PROFILE` (the standard boto3 credential chain) and the region in `AWS_REGION`, or the regions
+sent with the scan request.
 
 ```powershell
-$scan = Invoke-RestMethod -Method Post http://localhost:8000/api/scans
-Invoke-RestMethod http://localhost:8000/api/scans/$($scan.id)
-Invoke-RestMethod http://localhost:8000/api/findings
+python -m uvicorn cloudshield.api.app:create_app --factory --port 8000
 ```
 
-Request a fix for a finding and export it to files you can review. CloudShield only writes text;
-it never runs anything in your account:
+The server listens on 127.0.0.1 only. Keep it that way (see Safety).
 
-```powershell
-$id = (Invoke-RestMethod "http://localhost:8000/api/findings?status=OPEN")[0].finding_id
-Invoke-RestMethod -Method Post "http://localhost:8000/api/findings/$id/fix"
-python -m cloudshield.fixes export $id --dir fixes-out
-```
-
-The export also writes the guardrails for the finding, under `fixes-out/guardrails/`: ready-to-copy
-files that stop the problem coming back, such as a GitHub Actions workflow or a setting for the
-whole account. The Fix tab shows them under "Prevent it coming back", each with a status read from
-your last scan. See `docs/guardrails.md`. The scan now also reads the account-wide S3 public access
-block, so add `s3:GetAccountPublicAccessBlock` to your read-only policy
-(`docs/aws-readonly-policy.json`).
-
-An AI explanation is optional. Set `GEMINI_API_KEY`, `GEMINI_MODEL` and, if you want one,
-`GEMINI_FALLBACK_MODEL` in the API's environment. Without them a fixed template explanation is
-used. See `docs/ai-data.md` for exactly what is sent. To test the settings, run
-`python -m cloudshield.fixes ai-check` in the same window where you set them.
-
-In a second terminal, start the web app:
+### Frontend
 
 ```powershell
 cd web
+npm ci
 npm run dev
 ```
 
-Open http://localhost:5173. The header shows "API online v{version}" when the API is reachable,
-the last scan, and the Run scan button. The dashboard has an Overview (a board of what to fix now,
-next and later), Findings (with a detail page for each), Resources and Scans. It only reads from the
-API and starts scans. It never changes anything in AWS.
+Open http://localhost:5173 at exactly that address. The API refuses a write (a scan, a dismissal,
+an upload, a fix) that comes from any other web address, and `localhost` and `127.0.0.1` count as
+different addresses. To use another address, set `FRONTEND_ORIGIN` on the server. The web app reads
+`VITE_API_URL` (default `http://localhost:8000`). It loads three fonts from Google Fonts and falls
+back to system fonts if that is blocked.
 
-Open the dashboard at that exact address. The API refuses a write (a scan, a dismissal, an upload,
-a fix) that comes from any other web address, and `localhost` and `127.0.0.1` count as different
-addresses: the dashboard opened at http://127.0.0.1:5173 cannot start scans. To use another
-address, set `FRONTEND_ORIGIN` on the server to it. Scripts and `Invoke-RestMethod` send no origin
-and are not affected.
+### Look at it on demo data (no AWS account needed)
 
-The Overview headline reads "{N} fixed." and "{F} to fix now.". F counts the findings in the Fix
-now lane (risk score 80 or more) that are open, not dismissed, not merged and not informational,
-from CloudShield and from imported scans alike. Below it, the Next, Later, informational and
-dismissed counts each open the matching Findings list.
-
-The web app loads three fonts (Bricolage Grotesque, Public Sans and IBM Plex Mono) from Google Fonts,
-so your browser contacts Google Fonts when the page opens. If that is blocked, the page falls back to
-system fonts and works the same.
-
-The web app's own tests, which use a mocked API, run with:
+The demo builds a made-up AWS account with moto, runs the real scanner, rules and scoring on it,
+scans again after a simulated fix, and imports a hand-written results file. Nothing in it is from a
+real account, and the dashboard says so in a banner.
 
 ```powershell
-cd web
-npm test
+python -m cloudshield.demo seed --db demo.db
+$env:DATABASE_URL = "sqlite:///demo.db"
+$env:FRONTEND_ORIGIN = "http://localhost:5173"
+$env:AWS_PROFILE = "demo-no-such-profile"
+python -m uvicorn cloudshield.api.app:create_app --factory --port 8000
 ```
 
-## Login (optional)
+In a second terminal run `npm run dev` in `web/` as above. The demo has findings in every lane,
+three merged pairs, one disagreement between the two tools, a few imported-only findings, three
+resolved findings and an active account-wide guardrail.
 
-A simple lock for showing the project, off by default. Turn it on with `AUTH_ENABLED=true` in
-`.env`, with a password hash for the owner (and optionally one for a viewer, who can only look) and
-a random `SESSION_SECRET`. Make them with `python -m cloudshield.auth hash-password` and
-`python -m cloudshield.auth secret`. It is one shared password for each role, with no sign-up, no
-per-user data and no password reset. It is not a multi-user system, and a server that holds your AWS
-credentials should still not be exposed to the internet. Set `COOKIE_SECURE=true` behind HTTPS, and
-use `localhost` for both the dashboard and the API. See `docs/auth.md`.
+- The command stops if `demo.db` exists. `--force` replaces a file only if every scan in it is
+  labelled as demo data, so it can never replace a real database.
+- Setting `AWS_PROFILE` to a name that does not exist makes a stray click on Run scan fail before
+  any AWS call. Do not run a real scan into `demo.db`: the banner then goes away, because the
+  newest scan is no longer demo data.
+- The demo needs moto, which `pip install -e ".[dev]"` installs.
 
-## Import Prowler findings
+## The six rules
 
-Run Prowler yourself with JSON-OCSF output, then import the file:
+| Id | Severity | What it reports |
+|---|---|---|
+| CIS-S3-001 | High | An S3 bucket does not block all public access |
+| CIS-S3-002 | Info | A bucket's default encryption does not use a KMS key (not counted in the risk score) |
+| CIS-S3-003 | Medium | S3 versioning is not enabled |
+| CIS-SG-001 | High | A security group allows SSH or all traffic from the internet |
+| CIS-IAM-001 | High or Medium | A customer-managed IAM policy allows all actions (High) or all resources (Medium) |
+| SX-IAM-PRIVESC-001 | High | IAM permissions match one of 15 known privilege-escalation methods |
+
+The ids are CloudShield's own names, not references to a benchmark. A rule never reports a finding
+for a value it could not read. Scores start from the severity (Critical 90, High 70, Medium 40,
+Low 20) and add context: +15 when a bucket or security group is configured to be reachable from the
+internet, +10 when a security group is attached to a running instance, +10 when a policy is
+attached to something. Fix now is a score of 80 or more, Next is 60 to 79, Later is below 60. See
+`docs/risk-scoring.md`.
+
+## Imported findings
+
+You can import the JSON-OCSF results of [Prowler](https://github.com/prowler-cloud/prowler) in
+three ways: `python -m cloudshield.imports prowler <file>`, "Import a results file" in the dashboard's
+Run scan menu, or "Run full scan", which starts Prowler for this computer's account. They are shown
+beside CloudShield's own findings and always labelled Imported.
+
+- Imported evidence is **reported**, never verified: CloudShield did not collect it.
+- Imported findings get no patches and no AI text. The Fix page shows the scanner's own advice, and
+  for 13 checks a short "What to do" written by CloudShield from AWS documentation. Check it against
+  the page it links to before you act.
+- The score comes from the severity alone. Our own context is added only when the same resource is
+  in our own scan.
+- When an imported check tests exactly what one of our rules tests (three S3 checks) and both
+  fail, it is shown once, as ours, with "also reported by an imported scan". When they disagree,
+  both stay visible and are flagged.
+- An imported finding is resolved only when a newer import shows the same check and resource as
+  passing. One that a newer import leaves out stays open and is marked "not rechecked".
+- The dashboard names the scanner only where an install or run command needs it. Credit is in
+  `docs/third-party.md` and below.
+
+See `docs/extended-checks.md` for installing Prowler, and `docs/limitations.md` for every detail.
+
+## Guardrails
+
+A fix repairs what is wrong now. A guardrail ("Prevent it coming back") is text that makes the
+problem harder to bring back: an account-wide setting, a check for your build pipeline, an AWS
+Config rule, or an organization policy. Like a fix, you apply it yourself. Each one shows a status
+read from your last completed scan each time you look:
+
+| Status | Meaning |
+|---|---|
+| Active | A scan read the setting and found it on. Only the account-wide S3 public access block can be active |
+| Not active | A scan read the account and the setting is missing or off |
+| Unknown | CloudShield cannot see it (your pipeline, AWS Config rules), or the read failed |
+| Needs organization admin | Only your organization's management account can apply or read it |
+
+"Active" is never shown without a read that found it on. The scan reads the account-wide block, so
+the read-only policy needs `s3:GetAccountPublicAccessBlock`. See `docs/guardrails.md`.
+
+## Docker mode
+
+Instead of installing Prowler, set `PROWLER_MODE=docker` in `.env` (Docker Desktop must be running)
+and, for repeatable results, pin `PROWLER_DOCKER_IMAGE` to a version tag. `python -m cloudshield.imports check-runner`
+checks Docker and the image without starting a scan. Put `CLOUDSHIELD_DATA_DIR` outside OneDrive.
+The container sees only its run folder and the AWS credentials of the server's profile. See the Docker
+section of `docs/extended-checks.md`.
+
+## Honesty rules
+
+- A result is called verified only when a scan found the evidence. Imported evidence is "reported".
+- Unknown is not fixed. A finding is resolved only after a rescan or a newer import confirms it,
+  and not when the scan could not read what its rule needs.
+- Data from mocks or made-up files is labelled as such, in the files, the docs and the dashboard.
+- Rule ids are CloudShield's own. No citation or benchmark number is invented.
+- A fix says what CloudShield did not check, and never calls a change safe.
+- The optional AI explanation is text only, is checked against the data, and is never used for
+  imported findings. See `docs/ai-data.md` for exactly what is sent.
+
+## Safety
+
+- AWS access is **read-only**. Use the policy in `docs/aws-readonly-policy.json` (explained in
+  `docs/aws-permissions.md`). Nothing CloudShield writes is ever run for you.
+- Run the server on localhost only, and never expose the port. Anyone who can reach it can start
+  scans with the server's AWS credentials, read all findings and upload files. There is no login.
+- Never commit `.env`, a database, or a scan or Prowler output file: they hold real account data and
+  keys. `.gitignore` covers them. Secrets come from the environment only.
+- The dashboard masks 12-digit account ids in titles and evidence. This is a display change, not a
+  guarantee (see `docs/limitations.md`).
+
+## Experiments
+
+`experiments/` measures two things on synthetic data only (fake accounts made with moto and
+hand-written files), for the research paper: whether the resolver keeps a finding open when a scan
+or import could not confirm something (E1), and whether the patches CloudShield writes are valid
+for the tool that runs them (E4). Rerun them with:
 
 ```powershell
-python -m alembic upgrade head
-python -m cloudshield.imports prowler path\to\prowler-output.ocsf.json
+python -m experiments.run_all
 ```
 
-Imported findings are marked with their source, and their evidence is labelled "reported". Three
-imported checks (public access block, object versioning and KMS encryption of S3 buckets) test the
-same thing as one of CloudShield's own rules, so when both fail on a bucket they are shown once.
-See `docs/limitations.md` and `docs/third-party.md`.
+This rewrites the CSV files in `experiments/results/`. E1 takes about 40 seconds. The Terraform and
+CloudFormation checks of E4 need extra tools; see `experiments/README.md`.
 
-To run the extended checks from the dashboard ("Run full scan"), install Prowler yourself and
-check that CloudShield can start it:
+## Numbers for the paper
 
 ```powershell
-python -m cloudshield.imports check-runner
+python -m cloudshield.report numbers --db demo.db --out numbers.md --csv numbers.csv
 ```
 
-See `docs/extended-checks.md` for the install steps and the settings.
+It reads the database only and prints and saves findings by rule, severity and lane, merged pairs,
+resolved findings with their dates and reasons, scans, imports, guardrail statuses, versions, the AI
+model names and the experiment summaries. Account ids and resource names are replaced by aliases, so
+the output is safe to share. Test counts are left for you to fill in. Run
+`python -m alembic upgrade head` on a database made before this version first.
 
-Instead of a local install, CloudShield can run the Prowler container: set `PROWLER_MODE=docker`
-in `.env` (Docker Desktop must be running). The same `check-runner` command then checks Docker and
-the image. Put `CLOUDSHIELD_DATA_DIR` outside OneDrive. See the Docker section of
-`docs/extended-checks.md`.
+## Tests
 
-If your computer blocks Prowler, run it somewhere else (for example AWS CloudShell) and import the
-file from the dashboard: choose "Import a results file" in the Run scan menu. The window shows the
-commands to run and takes the `.json` file. The same steps are in `docs/extended-checks.md`.
-
-The fix page of an imported finding shows the scanner's advice formatted as it was meant, and, for
-13 checks, a "What to do" section written by CloudShield from AWS documentation. Check those steps
-against the AWS page they link to before you act.
-
-## Checks
-
-From the repository root, with the virtual environment active:
+From the repository root:
 
 ```powershell
-pytest -q
+python -m pytest -q
 ```
 
 Then in `web/`:
@@ -189,88 +229,55 @@ npm run build
 npm test
 ```
 
-Continuous integration also runs `ruff check` and `ruff format --check` on the Python code.
+`pytest` runs the whole Python suite on mocked AWS (moto) and a mocked Gemini, with no network,
+credentials or key. `npm test` runs the vitest suite against a mocked API. Continuous integration
+also runs `ruff check` and `ruff format --check`.
 
-### Browser test of the login
+Two Playwright suites open the real dashboard in your installed Chrome or Edge: `npm run e2e`
+(read-only) and `npm run e2e:actions`
+(**scans your real AWS account**, may call Gemini and Docker, and refuses to start unless you
+confirm). They are never run by CI. See `docs/browser-tests.md`.
 
-`npm run e2e:auth` in `web/` starts its own API (port 8012, login on, made-up passwords, a
-throwaway database with one made-up finding) and dashboard (port 5184), and logs in as a viewer. It
-checks that the action controls are disabled and that nothing but the login and logout is written.
-The two suites below start their API with `AUTH_ENABLED=false`.
+## Limitations
 
-### Browser tests (read-only)
+- Real-account checks covered S3 buckets, security groups and customer-managed IAM policies. EC2
+  instances and IAM roles are verified with mocks only, and EC2 data with a real account in one
+  region only.
+- The privilege-escalation rule checks 15 methods and ignores permission boundaries, service
+  control policies and resource policies. Exposure is configuration only: route tables and network
+  ACLs are not checked.
+- Only one scan or import runs at a time, in one server process. The AI hour limit lives in that
+  process's memory.
+- Only Prowler 5.44.0 output has been checked. Docker mode was run by hand once, on Windows.
+- Moto is not AWS, so the demo and the experiments show behavior on small made-up accounts.
 
-`web/e2e/` holds Playwright tests that open the real dashboard in your installed Google Chrome
-(or Microsoft Edge) against the real local API. They download no browser. In `web/`:
+The full list is in `docs/limitations.md`.
 
-```powershell
-npm run e2e
+## Credits
+
+Imported results come from [Prowler](https://github.com/prowler-cloud/prowler), licensed under the
+Apache License 2.0. The version whose output was checked is 5.44.0. CloudShield does not bundle
+Prowler or copy any of its code. The guardrail workflows name [Checkov](https://github.com/bridgecrewio/checkov)
+(Apache-2.0) checks, and the import format is OCSF 1.5.0. See `docs/third-party.md`.
+
+## Project layout
+
 ```
-
-If the API (127.0.0.1:8000) and the dev server (localhost:5173) are not running, the command starts
-them with `.venv\Scripts\python.exe` and stops them afterwards; servers that are already running
-are reused. The tests read the data that is in your database and skip a test, with the reason, when
-the data it needs is missing (for example no imported finding). Type-check them with
-`npm run typecheck:e2e`.
-
-They only read. Every request to `/api` that is not a GET is stopped and fails the test with its
-URL, and any console error, page error or failed request fails it too. They never press Run scan,
-Run full scan, Generate fix, Dismiss or the upload.
-
-What they do not cover (the action tests below cover some of it):
-
-- The text of an imported fix ("What to do", "Plain words", the formatted guidance) and the
-  stored fix of a CloudShield finding. The page shows them only after Generate fix, which sends a
-  POST. That test is listed as skipped.
-- Anything that writes: scans, dismissals, uploads, rescans.
-- Visual design, screen sizes other than the default, and browsers other than Chrome or Edge.
-- Windows is assumed: the Chrome and Edge paths and the virtual environment path are Windows ones.
-- Opening the Run scan menu makes the API check the extended runner (`/api/extended/status`),
-  which in Docker mode runs `docker version` and `docker image inspect`. It starts no scan and
-  no container.
-
-### Browser tests that act (run by you, never by CI)
-
-`web/e2e-actions/` holds Playwright tests that change things. They are separate from the read-only
-tests, have their own config, and refuse to start unless you confirm. **They do real work:**
-
-- They scan the AWS account of the profile in your `.env` (read-only calls, the `cloudshield`
-  profile). A scan takes minutes.
-- "Generate fix" calls Gemini when `GEMINI_API_KEY` and `GEMINI_MODEL` are set in your `.env`.
-  That is a few calls, and they count against `AI_MAX_CALLS_PER_HOUR`.
-- "Run full scan" runs Prowler, in Docker if `PROWLER_MODE=docker`, and the test waits up to 30
-  minutes. It is skipped, with the reason, when `/api/extended/status` says it cannot run.
-- They write only to a throwaway database, `e2e-actions.db` in the project folder, which is made
-  from the migrations before the run and deleted before and after it. Your real `cloudshield.db`
-  is never opened. They use their own API (port 8010) and web server (port 5183), which are never
-  reused: if a port is busy the run stops.
-
-Run them from `web/`:
-
-```powershell
-$env:CLOUDSHIELD_E2E_ACTIONS = "yes"
-npm run e2e:actions
+src/cloudshield/
+  config.py  findings.py  dispositions.py
+  scanner/      read-only AWS discovery
+  rules/        the six rules and their evidence
+  risk/         scores and context
+  fixes/        fix text, optional explanation, export
+  guardrails/   "Prevent it coming back" and their status
+  imports/      Prowler import, run, merge and guidance
+  ai/           knowledge for fix explanations only
+  api/          FastAPI routes and response shapes
+  db/           models, store and migrations
+  demo/         the demo data seed
+  report/       the numbers command
+tests/          the Python test suite
+web/            React, TypeScript, Vite and Tailwind
+docs/           guides and limitations
+experiments/    the research experiments
 ```
-
-Without `CLOUDSHIELD_E2E_ACTIONS=yes` the command prints what the tests do and stops. To run one
-test, add its name: `npm run e2e:actions -- -g "dismissing"`. Type-check them with
-`npm run typecheck:e2e`.
-
-The tests run in order, one at a time, and each builds on the one before; after a failure the rest
-are skipped.
-
-1. The header says the API is online, on an empty database.
-2. Run scan completes and the Overview shows findings.
-3. The fix of a CIS-S3-001 finding has patches, "CloudShield did not check" and guardrail cards.
-   Skipped if the scan found no such finding.
-4. Dismissing a finding takes it out of the headline and lane counts, and undoing brings it back.
-5. A synthetic results file (made up by the test, fake account `000000000000`) is imported, and
-   the same file again is refused as already imported.
-6. Run full scan adds a new import with the origin Dashboard.
-7. Every test fails on a console error, a page error, a failed request or an error response (the
-   expected "already imported" refusal is the only one allowed), and on any request to an API other
-   than the test API.
-
-They keep no screenshots, videos or traces. Because they use the real account and the real Gemini
-key, run them on your own computer only. If a run is stopped halfway, delete `e2e-actions.db` by
-hand.

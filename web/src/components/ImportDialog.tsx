@@ -25,7 +25,7 @@ function problemWith(file: File): string | null {
 
 function CommandRow({ text, label }: { text: string; label: string }) {
   return (
-    <div className="flex items-start gap-2 rounded-chip border-[1.5px] border-ink bg-white pl-3">
+    <div className="flex items-start gap-2 rounded-chip border border-ink bg-white pl-3">
       <code className="min-w-0 flex-1 py-3 font-mono text-label break-all">{text}</code>
       <CopyButton text={text} label={label} />
     </div>
@@ -108,9 +108,9 @@ export function ImportDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={(event) => trapFocus(event, () => !uploading && onClose())}
-        className="max-h-full w-full max-w-2xl overflow-auto rounded-lane border-2 border-ink bg-paper p-6 outline-none"
+        className="max-h-full w-full max-w-2xl overflow-auto rounded-lane border border-ink bg-paper p-6 outline-none"
       >
-        <h2 id={titleId} className="font-display text-h3 leading-tight font-extrabold">
+        <h2 id={titleId} className="text-title leading-tight font-bold">
           Import a results file
         </h2>
         <p className="mt-2 text-secondary text-dim">
@@ -163,7 +163,7 @@ export function ImportDialog({
               setDragging(false);
               chosen(event.dataTransfer.files);
             }}
-            className={`mt-2 flex flex-col items-start gap-3 rounded-lane border-2 border-dashed border-ink p-4 ${
+            className={`mt-2 flex flex-col items-start gap-3 rounded-lane border border-dashed border-ink p-4 ${
               dragging ? "bg-lane-grey" : "bg-white"
             }`}
           >

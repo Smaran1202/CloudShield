@@ -39,22 +39,23 @@ export function ResourceDetail() {
             <Crumb />
             <header className="rise mb-8">
               <h1 className="font-display text-detail leading-none font-extrabold tracking-[-0.03em]">
-                {resource.name}
+                {maskAccountIds(resource.name)}
               </h1>
               <p
                 className="mt-3 font-mono text-secondary text-dim"
                 title={resource.resource_id}
               >
                 {resource.resource_type}, {resource.region ?? "global"},{" "}
-                {shortResource(resource.resource_id)}
+                {maskAccountIds(shortResource(resource.resource_id))}
               </p>
             </header>
             <div className="space-y-6">
               <Card>
                 <SectionTitle>Stored attributes</SectionTitle>
                 <p className="mt-2 mb-4 text-secondary break-all text-dim">
-                  {resource.resource_id}, last seen in scan {resource.last_seen_scan_id}.
-                  A missing attribute means a call failed, so it is unknown, not off.
+                  {maskAccountIds(resource.resource_id)}, last seen in scan{" "}
+                  {resource.last_seen_scan_id}. A missing attribute means a call failed,
+                  so it is unknown, not off.
                 </p>
                 {Object.keys(resource.attributes).length === 0 ? (
                   <p className="text-secondary">No attributes were stored.</p>
@@ -64,8 +65,8 @@ export function ResourceDetail() {
                       <div key={key}>
                         <dt className="font-mono text-secondary font-medium">{key}</dt>
                         <dd>
-                          <pre className="mt-1 overflow-x-auto rounded-chip bg-paper p-3 font-mono text-label">
-                            {pretty(value)}
+                          <pre className="mt-1 rounded-chip bg-paper p-3 font-mono text-label break-all whitespace-pre-wrap">
+                            {maskAccountIds(pretty(value))}
                           </pre>
                         </dd>
                       </div>

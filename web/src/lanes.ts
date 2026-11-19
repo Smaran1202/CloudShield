@@ -120,6 +120,16 @@ export function checkTitle(row: FindingOut): string {
   return typeof own === "string" && own ? own : row.title;
 }
 
+// A security group shows "name (sg-id)" when a name was stored. Anything else shows its id.
+export function resourceLabel(finding: {
+  resource_id: string;
+  resource_name?: string | null;
+}): string {
+  const id = shortResource(finding.resource_id);
+  const name = finding.resource_name;
+  return name && name !== finding.resource_id ? `${name} (${id})` : id;
+}
+
 // "arn:aws:iam::123456789012:policy/name" is shown as "...:policy/name".
 export function shortResource(id: string): string {
   if (!id.startsWith("arn:")) return id;

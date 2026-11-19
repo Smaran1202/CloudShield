@@ -55,9 +55,9 @@ export function DismissDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={(event) => event.key === "Escape" && onClose()}
-        className="max-h-full w-full max-w-xl overflow-auto rounded-lane border-2 border-ink bg-paper p-6"
+        className="max-h-full w-full max-w-xl overflow-auto rounded-lane border border-ink bg-paper p-6"
       >
-        <h2 id={titleId} className="font-display text-h3 leading-tight font-extrabold">
+        <h2 id={titleId} className="text-title leading-tight font-bold">
           Dismiss this finding
         </h2>
         <p className="mt-2 text-secondary text-dim">

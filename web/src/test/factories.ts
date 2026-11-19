@@ -28,6 +28,7 @@ export function scan(overrides: Partial<ScanOut> = {}): ScanOut {
     extended_status: "skipped",
     extended_message: null,
     extended_hint: null,
+    data_label: null,
     ...overrides,
   };
 }
@@ -38,6 +39,7 @@ export function finding(overrides: Partial<FindingOut> = {}): FindingOut {
     rule_id: "CIS-SG-001",
     resource_id: "sg-0abc123",
     resource_type: "Security Group",
+    resource_name: null,
     title: "Security group allows SSH or all traffic from the internet",
     severity: "HIGH",
     category: "Network",

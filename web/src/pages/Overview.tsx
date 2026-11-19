@@ -20,7 +20,6 @@ import {
   SectionTitle,
   SeverityChip,
   Tag,
-  useMountValue,
 } from "../components/ui";
 import { formatDate, formatRelative, plural, ruleLabel, scanDuration } from "../format";
 import {
@@ -31,12 +30,13 @@ import {
   isActive,
   isDismissed,
   LANE_BACKGROUND,
+  LANE_BORDER,
   LANE_EMPTY,
   LANE_HINT,
   LANE_NAME,
   LANE_THRESHOLDS,
   laneOf,
-  shortResource,
+  resourceLabel,
   startWith,
   type Lane,
 } from "../lanes";
@@ -44,19 +44,10 @@ import { useRefreshWhenScanEnds, useScans } from "../ScanContext";
 import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
 
-const HEADLINE =
-  "font-display text-display leading-[0.95] font-extrabold tracking-[-0.045em]";
+const HEADLINE = "font-display text-display leading-tight font-bold tracking-[-0.03em]";
 
 const CHART_BARS = 8;
 const CHART_HEIGHT = 128;
-
-function MaskLine({ children, delay }: { children: string; delay: number }) {
-  return (
-    <span className="mask-line">
-      <span style={{ animationDelay: `${delay}ms` }}>{children}</span>
-    </span>
-  );
-}
 
 export function Overview() {
   const { scans, reloadScans } = useScans();
@@ -73,12 +64,9 @@ function OverviewBody({ scans }: { scans: ScanOut[] }) {
     return (
       <div>
         <h1 className={HEADLINE}>
-          <MaskLine delay={0}>No scan yet. Run a scan.</MaskLine>
+          <span className="block">No scan yet. Run a scan.</span>
         </h1>
-        <p
-          className="rise mt-6 max-w-2xl text-body text-dim"
-          style={{ animationDelay: "300ms" }}
-        >
+        <p className="rise mt-6 max-w-2xl text-body text-dim">
           {latest
             ? "Nothing has completed yet, so there are no results to show."
             : "CloudShield only shows results from a real scan of your account."}
@@ -99,7 +87,7 @@ function Board({ scans }: { scans: ScanOut[] }) {
   useRefreshWhenScanEnds(reloadFindings);
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-12">
       <AsyncView
         state={findings}
         onRetry={reloadFindings}
@@ -134,11 +122,7 @@ function GuardrailLine() {
       ? "Guardrails: could not be read."
       : `Guardrails: ${countOf(guardrails.data, "active")} active, ${countOf(guardrails.data, "unknown")} unknown.`;
   return (
-    <p
-      data-testid="guardrail-line"
-      className="rise mt-3 text-secondary text-dim"
-      style={{ animationDelay: "500ms" }}
-    >
+    <p data-testid="guardrail-line" className="rise">
       {text}
     </p>
   );
@@ -167,20 +151,37 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
       ? "Only informational findings are open."
       : "Nothing is open.";
 
+  // The small print about the score bands and guardrails sits under the Fix next card.
+  const notes = (
+    <div className="mt-3 space-y-1 text-label text-dim">
+      <p className="rise max-w-3xl">
+        Fix now is a risk score of {LANE_THRESHOLDS.fixNow} or more, Next is{" "}
+        {LANE_THRESHOLDS.next} to {LANE_THRESHOLDS.fixNow - 1}, and Later is below{" "}
+        {LANE_THRESHOLDS.next}. CloudShield never changes your AWS account: you apply
+        every fix yourself.
+      </p>
+      <GuardrailLine />
+    </div>
+  );
+
   return (
-    <div className="space-y-16">
+    <div className="space-y-12">
       <div
         data-testid="hero"
-        className={`grid gap-12 ${top ? "min-[1100px]:grid-cols-[1.4fr_1fr]" : ""}`}
+        className={`grid gap-8 ${top ? "min-[1100px]:grid-cols-[1.4fr_1fr]" : ""}`}
       >
         <div>
           <h1 className={HEADLINE}>
-            <MaskLine delay={0}>{`${resolved.length} fixed.`}</MaskLine>
-            <MaskLine delay={130}>
-              {counts.now === 0 ? "Nothing to fix now." : `${counts.now} to fix now.`}
-            </MaskLine>
+            <span className="block">{`${resolved.length} fixed.`}</span>
+            <span className="block">
+              {counts.now > 0
+                ? `${counts.now} to fix now.`
+                : counts.next > 0
+                  ? `Nothing to fix now. ${counts.next} in Next.`
+                  : "Nothing to fix now."}
+            </span>
           </h1>
-          <p className="rise mt-6 text-h3" style={{ animationDelay: "400ms" }}>
+          <p className="rise mt-4 text-title">
             {top ? (
               <>
                 Start with{" "}
@@ -196,64 +197,57 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
               fallback
             )}
           </p>
-          <CountLine
-            testId="lane-counts"
-            delay={450}
-            parts={[
-              [counts.next, "next", "/findings?lane=next"],
-              [counts.later, "later", "/findings?lane=later"],
-              [informational.length, "informational", "/findings?lane=open&info=only"],
-              [dismissed, "dismissed", "/findings?lane=dismissed"],
-            ]}
-          />
-          {anyImported && (
+          <div className="mt-4 space-y-1">
             <CountLine
-              testId="source-counts"
-              delay={500}
+              testId="lane-counts"
               parts={[
-                [
-                  foundHere,
-                  "found by CloudShield",
-                  "/findings?lane=open&source=cloudshield&info=hide",
-                ],
-                [imported, "imported", "/findings?lane=open&source=prowler&info=hide"],
+                [counts.next, "next", "/findings?lane=next"],
+                [counts.later, "later", "/findings?lane=later"],
+                [informational.length, "informational", "/findings?lane=open&info=only"],
+                [dismissed, "dismissed", "/findings?lane=dismissed"],
               ]}
             />
-          )}
-          <p
-            className="rise mt-3 max-w-3xl text-secondary text-dim"
-            style={{ animationDelay: "500ms" }}
-          >
-            Fix now is a risk score of {LANE_THRESHOLDS.fixNow} or more, Next is{" "}
-            {LANE_THRESHOLDS.next} to {LANE_THRESHOLDS.fixNow - 1}, and Later is below{" "}
-            {LANE_THRESHOLDS.next}. CloudShield never changes your AWS account: you apply
-            every fix yourself.
-          </p>
-          <GuardrailLine />
+            {anyImported && (
+              <CountLine
+                testId="source-counts"
+                parts={[
+                  [
+                    foundHere,
+                    "found by CloudShield",
+                    "/findings?lane=open&source=cloudshield&info=hide",
+                  ],
+                  [imported, "imported", "/findings?lane=open&source=prowler&info=hide"],
+                ]}
+              />
+            )}
+          </div>
+          {!top && notes}
         </div>
-        {top && <FixNextCard finding={top} />}
+        {top && (
+          <div className="self-start">
+            <FixNextCard finding={top} />
+            {notes}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-start gap-6">
         <LaneColumn
           lane="now"
           count={counts.now}
-          delay={450}
-          pulse={counts.now > 0}
           extra={
             more("now") ? <SeeAll lane="now" total={inLane("now").length} /> : undefined
           }
         >
           {inLane("now")
             .slice(0, TILES_PER_LANE)
-            .map((f, i) => (
-              <Tile key={f.finding_id} finding={f} lane="now" index={i} />
+            .map((f) => (
+              <Tile key={f.finding_id} finding={f} lane="now" />
             ))}
         </LaneColumn>
         <LaneColumn
           lane="next"
           count={counts.next}
-          delay={600}
           extra={
             more("next") ? (
               <SeeAll lane="next" total={inLane("next").length} />
@@ -262,14 +256,13 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
         >
           {inLane("next")
             .slice(0, TILES_PER_LANE)
-            .map((f, i) => (
-              <Tile key={f.finding_id} finding={f} lane="next" index={i} />
+            .map((f) => (
+              <Tile key={f.finding_id} finding={f} lane="next" />
             ))}
         </LaneColumn>
         <LaneColumn
           lane="later"
           count={counts.later}
-          delay={750}
           extra={
             inLane("later").length > 0 || noScore.length > 0 ? (
               <>
@@ -277,7 +270,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
                   <SeeAll lane="later" total={counts.later} />
                 )}
                 {noScore.length > 0 && (
-                  <li className="rounded-chip border-2 border-dashed border-dash p-4 text-secondary">
+                  <li className="rounded-chip border border-dashed border-dash p-4 text-secondary">
                     {noScore.length === 1
                       ? "1 informational finding with no risk score."
                       : `${noScore.length} informational findings with no risk score.`}{" "}
@@ -301,7 +294,7 @@ function BoardBody({ rows, scans }: { rows: FindingOut[]; scans: ScanOut[] }) {
 
       <DoneStrip resolved={resolved} />
 
-      <div className="grid items-start gap-12 min-[900px]:grid-cols-2">
+      <div className="grid items-start gap-8 min-[900px]:grid-cols-2">
         <ProgressCard resolved={resolved} total={resolved.length + active.length} />
         <ScansChart scans={scans} />
       </div>
@@ -315,18 +308,12 @@ const TILES_PER_LANE = 5;
 function CountLine({
   parts,
   testId,
-  delay,
 }: {
   parts: [number, string, string][];
   testId: string;
-  delay: number;
 }) {
   return (
-    <p
-      data-testid={testId}
-      className="rise mt-3 text-secondary font-semibold"
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <p data-testid={testId} className="rise text-secondary font-semibold">
       {parts.map(([count, label, to], index) => (
         <span key={label}>
           <Link to={to} className="underline underline-offset-4">
@@ -352,7 +339,7 @@ function LaterGroup({ rows }: { rows: FindingOut[] }) {
   const id = useId();
   const first = rows[0];
   return (
-    <li className="rounded-chip border-2 border-ink bg-paper p-4 text-ink">
+    <li className="rounded-chip border border-ink bg-white p-3 text-ink">
       <button
         type="button"
         aria-expanded={open}
@@ -382,7 +369,7 @@ function LaterGroup({ rows }: { rows: FindingOut[] }) {
               className="block truncate font-mono text-label text-dim"
               title={f.resource_id}
             >
-              {shortResource(f.resource_id)}, risk {f.risk_score}
+              {resourceLabel(f)}, risk {f.risk_score}
             </span>
           </li>
         ))}
@@ -418,32 +405,31 @@ function FixNextCard({ finding }: { finding: FindingOut }) {
   return (
     <section
       aria-label="Fix next"
-      className="rise self-start rounded-lane border-2 border-ink bg-white p-6"
-      style={{ animationDelay: "300ms" }}
+      className="rise self-start rounded-lane border border-ink bg-white p-6"
     >
       <h2 className="text-label font-semibold tracking-wide text-dim uppercase">
         Fix next
       </h2>
-      <div className="mt-4 flex gap-6">
+      <div className="mt-4 flex gap-4">
         <div
           data-lane={lane}
-          className={`flex h-[140px] w-[140px] shrink-0 items-center justify-center rounded-lane ${LANE_BACKGROUND[lane]}`}
+          className={`flex h-[96px] w-[96px] shrink-0 items-center justify-center rounded-lane ${LANE_BACKGROUND[lane]}`}
         >
-          <span className="font-display text-score-tile leading-none font-extrabold tabular-nums">
+          <span className="text-score-tile leading-none font-bold tabular-nums">
             {finding.risk_score}
           </span>
         </div>
         <div className="min-w-0">
-          <h3 className="font-display text-title leading-tight font-bold">
+          <h3 className="text-title leading-tight font-semibold">
             {maskAccountIds(finding.title)}
           </h3>
           <p
-            className="mt-2 truncate font-mono text-label text-dim"
+            className="mt-2 truncate font-mono text-label font-medium"
             title={finding.resource_id}
           >
-            {shortResource(finding.resource_id)}
+            {resourceLabel(finding)}
           </p>
-          <p className="mt-3 text-secondary">
+          <p className="mt-3 text-secondary text-dim">
             {certaintySummary(finding.evidence.items)}
           </p>
         </div>
@@ -458,100 +444,92 @@ function FixNextCard({ finding }: { finding: FindingOut }) {
   );
 }
 
+// A lane is a plain list under a 4px bar in the lane colour. The colour is never the only
+// sign: the lane name and its score range are written out.
 function LaneColumn({
   lane,
   count,
-  delay,
-  pulse = false,
   extra,
   children,
 }: {
   lane: Lane;
   count: number;
-  delay: number;
-  pulse?: boolean;
   extra?: ReactNode;
   children: ReactNode[];
 }) {
   const empty = children.length === 0 && !extra;
+  if (lane === "now" && empty) {
+    return (
+      <section
+        aria-label={LANE_NAME[lane]}
+        className={`rise flex flex-[1_1_100%] flex-wrap items-baseline gap-x-3 gap-y-1 self-start border-t-4 pt-3 ${LANE_BORDER[lane]}`}
+      >
+        <h2 className="text-title leading-none font-bold">{LANE_NAME[lane]}</h2>
+        <span className="text-title leading-none font-bold tabular-nums">{count}</span>
+        <p className="text-secondary text-dim">{LANE_EMPTY[lane]}</p>
+      </section>
+    );
+  }
   return (
     <section
       aria-label={LANE_NAME[lane]}
-      className={`rise flex-[1_1_300px] self-start rounded-lane p-6 ${LANE_BACKGROUND[lane]}`}
-      style={{ animationDelay: `${delay}ms` }}
+      className={`rise flex-[1_1_300px] self-start border-t-4 pt-4 ${LANE_BORDER[lane]}`}
     >
-      <header className="flex items-center gap-3">
-        <h2 className="font-display text-h2 leading-none font-extrabold">
-          {LANE_NAME[lane]}
-        </h2>
-        <span className="font-display text-h2 leading-none font-extrabold tabular-nums">
-          {count}
-        </span>
-        {pulse && (
-          <span aria-hidden="true" className="pulse-dot h-3 w-3 rounded-full bg-white" />
-        )}
+      <header className="flex items-baseline gap-3">
+        <h2 className="text-title leading-none font-bold">{LANE_NAME[lane]}</h2>
+        <span className="text-title leading-none font-bold tabular-nums">{count}</span>
       </header>
-      <p className="mt-1 mb-6 text-secondary font-medium">{LANE_HINT[lane]}</p>
-      <ul className="flex flex-col gap-4">
+      <p className="mt-1 mb-4 text-secondary text-dim">{LANE_HINT[lane]}</p>
+      <ul className="flex flex-col">
         {children}
         {extra}
-        {empty && <li className="text-secondary font-medium">{LANE_EMPTY[lane]}</li>}
+        {empty && <li className="text-secondary text-dim">{LANE_EMPTY[lane]}</li>}
       </ul>
     </section>
   );
 }
 
-function Tile({
-  finding,
-  lane,
-  index,
-}: {
-  finding: FindingOut;
-  lane: Lane;
-  index: number;
-}) {
-  const delay = useMountValue(550 + 120 * index);
+function Tile({ finding, lane }: { finding: FindingOut; lane: Lane }) {
   const big = lane === "now";
   return (
-    <li
-      className="tile rise relative rounded-chip border-2 border-ink bg-paper p-6 text-ink"
-      style={{ animationDelay: `${delay}ms` }}
-    >
+    <li className="tile board-row relative flex gap-4 border-t border-divider py-4 text-ink first:border-t-0">
       <span
-        className={`block font-display leading-none font-extrabold tabular-nums ${
+        className={`w-14 shrink-0 leading-none font-bold tabular-nums ${
           big ? "text-score-lane" : "text-score-tile"
         }`}
       >
         {finding.risk_score}
       </span>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Tag>{ruleLabel(finding.rule_id)}</Tag>
-        <SeverityChip severity={finding.severity} />
-        <FindingFlags finding={finding} />
-      </div>
-      <h3 className="mt-3 line-clamp-3 font-display text-title leading-tight font-bold">
-        <Link
-          to={`/findings/${encodeURIComponent(finding.finding_id)}`}
-          className="after:absolute after:inset-0 after:content-['']"
-        >
-          {maskAccountIds(finding.title)}
-        </Link>
-      </h3>
-      <div className="mt-2 flex items-center gap-1">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Tag>{ruleLabel(finding.rule_id)}</Tag>
+          <SeverityChip severity={finding.severity} />
+          <FindingFlags finding={finding} />
+        </div>
+        <h3 className="mt-2 line-clamp-3 text-body leading-tight font-semibold">
+          <Link
+            to={`/findings/${encodeURIComponent(finding.finding_id)}`}
+            className="after:absolute after:inset-0 after:content-['']"
+          >
+            {maskAccountIds(finding.title)}
+          </Link>
+        </h3>
+        <div className="mt-1 flex items-center gap-1">
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-label font-medium"
+            title={finding.resource_id}
+          >
+            {resourceLabel(finding)}
+          </span>
+          <CopyButton text={finding.resource_id} label={`Copy ${finding.resource_id}`} />
+        </div>
         <span
-          className="min-w-0 flex-1 truncate font-mono text-label text-dim"
-          title={finding.resource_id}
+          aria-hidden="true"
+          className="mt-2 inline-flex items-center gap-2 text-secondary font-semibold"
         >
-          {shortResource(finding.resource_id)}
+          Open fix <Icon name="arrow" size={18} className="arrow" />
         </span>
-        <CopyButton text={finding.resource_id} label={`Copy ${finding.resource_id}`} />
       </div>
-      <span
-        aria-hidden="true"
-        className="mt-3 inline-flex items-center gap-2 text-secondary font-semibold"
-      >
-        Open fix <Icon name="arrow" size={18} className="arrow" />
-      </span>
     </li>
   );
 }
@@ -562,20 +540,20 @@ function DoneStrip({ resolved }: { resolved: FindingOut[] }) {
   return (
     <section
       aria-label="Done"
-      className="done-strip flex flex-wrap items-center gap-4 rounded-lane bg-green p-6 text-white"
+      className="done-strip flex flex-wrap items-center gap-4 rounded-lane border-l-4 border-green bg-white p-4"
     >
-      <Check size={36} />
+      <span className="text-green">
+        <Check size={28} />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="font-display text-h3 font-extrabold">
-          Fixed: {maskAccountIds(latest.title)}
-        </p>
-        <p className="truncate font-mono text-label" title={latest.resource_id}>
-          {shortResource(latest.resource_id)}, resolved {formatDate(latest.resolved_at)}
+        <p className="text-body font-semibold">Fixed: {maskAccountIds(latest.title)}</p>
+        <p className="truncate font-mono text-label text-dim" title={latest.resource_id}>
+          {resourceLabel(latest)}, resolved {formatDate(latest.resolved_at)}
         </p>
       </div>
       <Link
         to={`/findings/${encodeURIComponent(latest.finding_id)}`}
-        className="inline-flex min-h-11 items-center gap-2 font-semibold underline"
+        className="inline-flex min-h-10 items-center gap-2 font-semibold underline"
       >
         See the finding <Icon name="arrow" size={18} />
       </Link>

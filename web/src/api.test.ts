@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { api, ApiError, messageFromDetail, setUnauthorizedHandler } from "./api";
+import { api, ApiError, messageFromDetail } from "./api";
 
 describe("messageFromDetail", () => {
   it("uses FastAPI's detail text", () => {
@@ -92,42 +92,5 @@ describe("api", () => {
       method: "POST",
       credentials: "include",
     });
-  });
-
-  it("sends the session cookie with every request, to the other origin the API is on", async () => {
-    const fetchMock = vi.fn(async () => new Response("[]", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-
-    await api.scans();
-    await api.dismiss("F-1", {
-      disposition: "accepted",
-      disposition_reason: "A reason that is long enough.",
-      disposition_until: null,
-    });
-    await api.logout();
-
-    for (const [, init] of fetchMock.mock.calls as unknown as [string, RequestInit][])
-      expect(init.credentials).toBe("include");
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-
-  it("calls the unauthorized handler on a 401, but not for a wrong password", async () => {
-    const handler = vi.fn();
-    setUnauthorizedHandler(handler);
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ detail: "Log in first." }), { status: 401 }),
-      ),
-    );
-
-    await api.scans().catch(() => null);
-    expect(handler).toHaveBeenCalledTimes(1);
-    const wrong = await api.login("owner", "nope").catch((e: unknown) => e);
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect((wrong as ApiError).status).toBe(401);
-    setUnauthorizedHandler(null);
   });
 });

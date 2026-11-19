@@ -6,6 +6,7 @@ import {
   LANE_HINT,
   LANE_THRESHOLDS,
   laneOf,
+  resourceLabel,
   shortResource,
   startWith,
 } from "./lanes";
@@ -148,6 +149,23 @@ describe("byScoreDescending", () => {
       "B",
       "A",
     ]);
+  });
+});
+
+describe("resourceLabel", () => {
+  it("puts the stored name before the id", () => {
+    expect(resourceLabel({ resource_id: "sg-0abc123", resource_name: "web" })).toBe(
+      "web (sg-0abc123)",
+    );
+  });
+
+  it("shows only the id when no name was stored", () => {
+    expect(resourceLabel({ resource_id: "sg-0abc123", resource_name: null })).toBe(
+      "sg-0abc123",
+    );
+    expect(resourceLabel({ resource_id: "my-bucket", resource_name: "my-bucket" })).toBe(
+      "my-bucket",
+    );
   });
 });
 

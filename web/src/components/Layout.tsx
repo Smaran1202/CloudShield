@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../api";
-import { useAuth } from "../auth";
 import { config } from "../config";
 import { scanChipText } from "../format";
 import { ScanProvider, useScans } from "../ScanContext";
 import { RunScanButton, ScanBar, ScanStatusLine } from "./ScanControl";
-import { Container, SECONDARY_BUTTON } from "./ui";
+import { Container } from "./ui";
 
 type Health =
   { state: "checking" } | { state: "online"; version: string } | { state: "offline" };
@@ -69,7 +68,13 @@ function ApiStatus() {
         : "bg-later-dot";
 
   return (
-    <p role="status" className="flex items-center gap-2 font-mono text-label">
+    // Online and checking are read out to screen readers but not drawn: only a problem shows.
+    <p
+      role="status"
+      className={`flex items-center gap-2 font-mono text-label ${
+        health.state === "offline" ? "" : "sr-only"
+      }`}
+    >
       <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${dot}`} />
       {text}
     </p>
@@ -84,7 +89,7 @@ function LastScanChip() {
     <Link
       to="/scans"
       data-flash={flash}
-      className={`inline-flex min-h-11 items-center rounded-chip border-2 border-ink px-3 font-mono text-label ${
+      className={`inline-flex min-h-10 items-center rounded-chip border border-ink px-3 font-mono text-label ${
         flash ? "chip-flash" : "bg-white"
       }`}
     >
@@ -93,32 +98,55 @@ function LastScanChip() {
   );
 }
 
-// Who is logged in, and the way out. Only shown when the login is turned on.
-function Account() {
-  const { enabled, role, logOut } = useAuth();
-  const [error, setError] = useState<string | null>(null);
-  if (!enabled) return null;
+const PILL =
+  "relative z-10 inline-flex h-10 items-center rounded-full px-4 text-body font-semibold";
+const PILL_IDLE = "text-dim hover:bg-pill-hover hover:text-ink active:bg-pill-press";
+
+// One oval sits behind the active item and slides to the new one. The links stay plain links:
+// the page is told apart by aria-current, never by the oval alone.
+function MainNav() {
+  const { pathname } = useLocation();
+  const nav = useRef<HTMLElement>(null);
+  const [oval, setOval] = useState<{ x: number; y: number; width: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const place = () => {
+      const active = nav.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      setOval(
+        active
+          ? { x: active.offsetLeft, y: active.offsetTop, width: active.offsetWidth }
+          : null,
+      );
+    };
+    place();
+    window.addEventListener("resize", place);
+    void document.fonts?.ready.then(place);
+    return () => window.removeEventListener("resize", place);
+  }, [pathname]);
+
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <nav ref={nav} aria-label="Main" className="relative flex flex-wrap gap-x-1 gap-y-1">
       <span
-        data-testid="role-badge"
-        className="inline-flex min-h-11 items-center rounded-chip border-2 border-ink bg-white px-3 font-mono text-label"
-      >
-        {role === "owner" ? "Owner" : "Viewer"}
-      </span>
-      <button
-        type="button"
-        className={SECONDARY_BUTTON}
-        onClick={() => logOut().catch(() => setError("Could not log out."))}
-      >
-        Log out
-      </button>
-      {error && (
-        <span role="alert" className="text-secondary font-semibold text-red">
-          {error}
-        </span>
-      )}
-    </div>
+        aria-hidden="true"
+        hidden={!oval}
+        data-testid="nav-oval"
+        className="nav-oval absolute top-0 left-0 h-10 rounded-full bg-ink"
+        style={{
+          width: oval?.width,
+          transform: `translate(${oval?.x ?? 0}px, ${oval?.y ?? 0}px)`,
+        }}
+      />
+      {NAV.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }) => `${PILL} ${isActive ? "text-white" : PILL_IDLE}`}
+        >
+          {item.label}
+        </NavLink>
+      ))}
+    </nav>
   );
 }
 
@@ -126,40 +154,39 @@ function Header() {
   const { runner } = useScans();
   return (
     <header className="sticky top-0 z-20 border-b border-ink bg-paper">
-      <Container className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 py-3">
-        <div className="flex flex-wrap items-center gap-x-12 gap-y-2">
+      <Container className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 py-3">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <Link
             to="/"
             className="font-display text-wordmark leading-none font-extrabold tracking-[-0.03em]"
           >
             cloudshield
           </Link>
-          <nav aria-label="Main" className="flex flex-wrap gap-x-6">
-            {NAV.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  `inline-flex min-h-11 items-center border-b-[3px] text-body font-semibold ${
-                    isActive ? "border-ink" : "border-transparent text-dim hover:text-ink"
-                  }`
-                }
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
+          <MainNav />
         </div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 min-[1100px]:ml-auto min-[1100px]:w-auto min-[1100px]:justify-end">
           <ApiStatus />
           <LastScanChip />
           <RunScanButton runner={runner} />
-          <Account />
         </div>
       </Container>
       {runner.phase === "running" && <ScanBar />}
     </header>
+  );
+}
+
+// Demo data says what it is on every page, for as long as the newest scan is demo data.
+function DataLabel() {
+  const { scans } = useScans();
+  const label = scans.status === "success" ? scans.data[0]?.data_label : null;
+  if (!label) return null;
+  return (
+    <p
+      role="note"
+      className="border-b border-ink bg-lane-grey px-4 py-2 text-center text-secondary font-semibold text-ink"
+    >
+      {label}
+    </p>
   );
 }
 
@@ -168,6 +195,7 @@ function Shell() {
   return (
     <div className="min-h-screen bg-paper">
       <Header />
+      <DataLabel />
       <Container className="py-8">
         <div aria-live="polite" className="text-secondary text-dim [&>p]:mb-4">
           <ScanStatusLine runner={runner} />

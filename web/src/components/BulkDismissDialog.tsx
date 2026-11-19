@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { api, type FindingOut } from "../api";
 import { maskAccountIds } from "../mask";
-import { shortResource } from "../lanes";
+import { resourceLabel } from "../lanes";
 import { messageOf } from "../useAsync";
 import { MIN_REASON } from "./DismissDialog";
 import { FIELD, PRIMARY_BUTTON, SECONDARY_BUTTON } from "./ui";
@@ -78,9 +78,9 @@ export function BulkDismissDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={(event) => event.key === "Escape" && !saving && onClose(changed)}
-        className="max-h-full w-full max-w-2xl overflow-auto rounded-lane border-2 border-ink bg-paper p-6"
+        className="max-h-full w-full max-w-2xl overflow-auto rounded-lane border border-ink bg-paper p-6"
       >
-        <h2 id={titleId} className="font-display text-h3 leading-tight font-extrabold">
+        <h2 id={titleId} className="text-title leading-tight font-bold">
           Dismiss all AWS-managed findings
         </h2>
 
@@ -93,13 +93,13 @@ export function BulkDismissDialog({
             </p>
             <ul
               aria-label="Findings that will be dismissed"
-              className="mt-4 max-h-60 space-y-2 overflow-auto rounded-chip border-2 border-ink bg-white p-3 text-secondary"
+              className="mt-4 max-h-60 space-y-2 overflow-auto rounded-chip border border-ink bg-white p-3 text-secondary"
             >
               {findings.map((finding) => (
                 <li key={finding.finding_id}>
                   <span className="font-semibold">{maskAccountIds(finding.title)}</span>
                   <span className="block font-mono text-label text-dim">
-                    {maskAccountIds(shortResource(finding.resource_id))}
+                    {maskAccountIds(resourceLabel(finding))}
                   </span>
                   <span className="block text-label text-dim">
                     {finding.suggested_not_applicable?.reason}

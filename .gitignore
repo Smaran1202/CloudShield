@@ -23,3 +23,5 @@ playwright-report/
 *.db-wal
 *.db-shm
 .vscode/
+numbers.md
+numbers.csv

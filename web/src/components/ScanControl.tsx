@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { api, type ScanOut } from "../api";
-import { useLock } from "../auth";
 import { useScans } from "../ScanContext";
 import { useAsync } from "../useAsync";
 import type { Runner } from "../useScanRunner";
@@ -65,9 +64,9 @@ export function ScanStatusLine({ runner }: { runner: Runner }) {
 }
 
 const SPLIT =
-  "inline-flex min-h-12 items-center justify-center gap-2 bg-ink text-secondary font-semibold text-white disabled:cursor-not-allowed disabled:opacity-70";
+  "btn inline-flex min-h-10 items-center justify-center gap-2 bg-ink text-secondary font-semibold text-white hover:bg-ink-hover active:bg-black disabled:cursor-not-allowed disabled:bg-lane-grey disabled:text-dim";
 const MENU_ITEM =
-  "flex w-full flex-col items-start gap-1 rounded-chip p-3 text-left text-secondary hover:bg-lane-grey disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent";
+  "btn flex w-full flex-col items-start gap-1 rounded-chip p-3 text-left text-secondary hover:bg-pill-hover active:bg-pill-press disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent";
 
 // The second choice in the menu. It asks whether the extended checks can run here, and when
 // they cannot it says why and what to do, instead of failing later.
@@ -140,7 +139,6 @@ export function RunScanButton({
   const running = runner.phase === "running";
   const [open, setOpen] = useState(false);
   const { openImport } = useScans();
-  const lock = useLock();
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,9 +169,9 @@ export function RunScanButton({
       <button
         type="button"
         onClick={() => pick(false)}
-        disabled={running || lock.disabled}
-        title={lock.title}
-        className={`${SPLIT} rounded-l-chip px-6`}
+        disabled={running}
+        aria-busy={running}
+        className={`${SPLIT} rounded-l-chip px-4`}
       >
         {running && <Spinner />}
         {running ? "Scanning..." : label}
@@ -183,10 +181,9 @@ export function RunScanButton({
         aria-label="More ways to scan"
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={running || lock.disabled}
-        title={lock.title}
+        disabled={running}
         onClick={() => setOpen(!open)}
-        className={`${SPLIT} rounded-r-chip border-l-2 border-paper px-3`}
+        className={`${SPLIT} rounded-r-chip border-l border-paper px-3`}
       >
         <Icon name="chevron" size={18} className={open ? "rotate-180" : ""} />
       </button>
@@ -194,7 +191,7 @@ export function RunScanButton({
         <div
           role="menu"
           aria-label="Ways to scan"
-          className="absolute top-full right-0 z-30 mt-2 w-[min(22rem,90vw)] rounded-lane border-2 border-ink bg-white p-2"
+          className="absolute top-full right-0 z-30 mt-2 w-[min(22rem,90vw)] rounded-lane border border-ink bg-white p-2"
         >
           <button
             type="button"

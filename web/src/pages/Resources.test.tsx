@@ -226,6 +226,20 @@ describe("Resource detail", () => {
     expect(screen.getByText("No findings.")).toBeInTheDocument();
   });
 
+  it("masks a 12-digit account number in the attributes and the id line", async () => {
+    const id = encodeURIComponent("arn:aws:iam::123456789012:policy/deploy");
+    renderApp(`/resources/${id}`, { ...routes, "GET /api/findings": [] });
+
+    await screen.findByRole("heading", { name: "deploy" });
+
+    const main = within(screen.getByRole("main"));
+
+    expect(main.queryByText(/123456789012/)).not.toBeInTheDocument();
+    expect(
+      main.getAllByText(/arn:aws:iam::•{8}9012:policy\/deploy/).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("says when the resource is not stored", async () => {
     renderApp("/resources/gone", routes);
 

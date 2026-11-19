@@ -147,7 +147,39 @@ describe("Overview: the hero", () => {
     expect(
       within(hero.children[0] as HTMLElement).getByRole("heading", { level: 1 }),
     ).toBeVisible();
-    expect(hero.children[1]).toBe(screen.getByRole("region", { name: "Fix next" }));
+    expect(hero.children[1].firstElementChild).toBe(
+      screen.getByRole("region", { name: "Fix next" }),
+    );
+  });
+
+  it("puts the score bands and the guardrails line under the Fix next card, not in the left column", async () => {
+    renderApp("/", results);
+
+    const hero = await screen.findByTestId("hero");
+    const left = hero.children[0] as HTMLElement;
+    const right = hero.children[1] as HTMLElement;
+
+    expect(
+      within(right).getByText(/Fix now is a risk score of 80 or more/),
+    ).toBeVisible();
+    expect(await within(right).findByTestId("guardrail-line")).toBeVisible();
+    expect(within(left).queryByText(/Fix now is a risk score/)).not.toBeInTheDocument();
+    expect(within(left).queryByTestId("guardrail-line")).not.toBeInTheDocument();
+  });
+
+  it("keeps the count lines together in one block under the headline", async () => {
+    renderApp("/", {
+      ...results,
+      "GET /api/findings": [row("A", 90), row("I", 70, { source: "prowler" })],
+    });
+
+    const lanes = await screen.findByTestId("lane-counts");
+
+    expect(lanes.parentElement).toHaveClass("space-y-1");
+    expect(lanes.parentElement).not.toHaveClass("border");
+    expect(lanes.parentElement).toContainElement(
+      await screen.findByTestId("source-counts"),
+    );
   });
 
   it("shows the Fix next card for the highest-risk open finding, with a 140px lane-coloured score", async () => {
@@ -156,8 +188,8 @@ describe("Overview: the hero", () => {
     const card = await screen.findByRole("region", { name: "Fix next" });
     const score = card.querySelector('[data-lane="now"]') as HTMLElement;
     expect(score).toHaveTextContent("95");
-    expect(score).toHaveClass("h-[140px]");
-    expect(score).toHaveClass("w-[140px]");
+    expect(score).toHaveClass("h-[96px]");
+    expect(score).toHaveClass("w-[96px]");
     expect(score).toHaveClass("bg-red");
     expect(within(card).getByText("Open SSH to the world")).toBeInTheDocument();
     expect(within(card).getByText("res-A")).toHaveAttribute("title", "res-A");
@@ -179,7 +211,7 @@ describe("Overview: the hero", () => {
 
     expect(button).toHaveAttribute("href", "/findings/F-A?tab=fix");
     expect(button).toHaveClass("bg-ink");
-    expect(button).toHaveClass("min-h-12");
+    expect(button).toHaveClass("min-h-10");
   });
 
   it("leaves the Fix next card out, and the hero single-column, when nothing scored is open", async () => {
@@ -214,6 +246,56 @@ describe("Overview: the hero", () => {
 
     expect(await screen.findByText("Nothing is open.")).toBeInTheDocument();
     expect(screen.getByText("Nothing to fix now.")).toBeInTheDocument();
+  });
+});
+
+describe("Overview: Fix now at zero", () => {
+  it("shows a compact strip for an empty Fix now and keeps Next and Later as lanes", async () => {
+    renderApp("/", { ...results, "GET /api/findings": [row("N", 70), row("L", 40)] });
+
+    const strip = await screen.findByRole("region", { name: "Fix now" });
+
+    expect(strip).toHaveTextContent("Fix now");
+    expect(strip).toHaveTextContent("0");
+    expect(strip).toHaveTextContent("Nothing is open at 80 or above.");
+    expect(strip).toHaveClass("flex-[1_1_100%]", "self-start");
+    expect(strip.querySelector("ul")).toBeNull();
+    expect(screen.getByRole("region", { name: "Next" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Later" })).toBeVisible();
+  });
+
+  it("is a normal lane when Fix now has findings", async () => {
+    renderApp("/", { ...results, "GET /api/findings": [row("A", 90)] });
+
+    const region = await screen.findByRole("region", { name: "Fix now" });
+
+    expect(region.querySelector("ul")).not.toBeNull();
+    expect(region).not.toHaveClass("flex-[1_1_100%]");
+  });
+
+  it("says what is waiting in Next, so it does not read as all done", async () => {
+    renderApp("/", { ...results, "GET /api/findings": [row("N", 70), row("N2", 65)] });
+
+    const headline = await screen.findByRole("heading", { level: 1 });
+
+    expect(headline).toHaveTextContent("Nothing to fix now. 2 in Next.");
+  });
+
+  it("keeps the plain wording when nothing is in Fix now or Next", async () => {
+    renderApp("/", { ...results, "GET /api/findings": [row("L", 40)] });
+
+    const headline = await screen.findByRole("heading", { level: 1 });
+
+    expect(headline.textContent).toContain("Nothing to fix now.");
+    expect(headline).not.toHaveTextContent("in Next");
+  });
+
+  it("keeps the N to fix now wording when Fix now has findings", async () => {
+    renderApp("/", { ...results, "GET /api/findings": [row("A", 90), row("B", 85)] });
+
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
+      "2 to fix now.",
+    );
   });
 });
 
@@ -335,7 +417,7 @@ describe("Overview: the lanes", () => {
       .getByRole("link", { name: "Wildcard policy" })
       .closest("li");
     expect(next?.querySelector(".text-score-tile")).toHaveTextContent("70");
-    expect(tile("Open SSH to the world")).toHaveClass("p-6");
+    expect(tile("Open SSH to the world")).toHaveClass("py-4");
   });
 
   it("shows a tile with the score, rule tag, severity chip, title, resource and an Open fix footer", async () => {

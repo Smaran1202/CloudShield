@@ -9,7 +9,6 @@ import type {
   GuardrailScope,
   PatchOut,
 } from "../api";
-import { useLock } from "../auth";
 import { Icon } from "./Icon";
 import { maskAccountIds } from "../mask";
 import type { FixState } from "../useFixRequest";
@@ -125,7 +124,6 @@ function GenerateStates({
   fix: FixState;
   generate: (refresh?: boolean) => void;
 }) {
-  const lock = useLock();
   return (
     <>
       {fix.status === "idle" && (
@@ -138,8 +136,6 @@ function GenerateStates({
             type="button"
             className={PRIMARY_BUTTON}
             onClick={() => generate(false)}
-            disabled={lock.disabled}
-            title={lock.title}
           >
             Generate fix
           </button>
@@ -479,18 +475,11 @@ function Explanation({
   onRegenerate: (() => void) | null;
 }) {
   const { explanation } = fix;
-  const lock = useLock();
   return (
     <div className="space-y-6">
       {onRegenerate && (
         <div className="flex justify-end">
-          <button
-            type="button"
-            className={SECONDARY_BUTTON}
-            onClick={onRegenerate}
-            disabled={lock.disabled}
-            title={lock.title}
-          >
+          <button type="button" className={SECONDARY_BUTTON} onClick={onRegenerate}>
             Regenerate explanation
           </button>
         </div>

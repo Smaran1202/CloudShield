@@ -127,7 +127,7 @@ describe("finish", () => {
     expect(found).toEqual([]);
   });
 
-  it("uses the lift shadow only in the tile hover state", () => {
+  it("uses no shadow at all: the design is flat", () => {
     const shadows: string[] = [];
     for (const [name, text] of Object.entries(pageCode)) {
       for (const hit of matches(
@@ -138,8 +138,6 @@ describe("finish", () => {
       }
     }
 
-    // Animated pulse dot (motion.css) and the tile hover are the only box-shadows.
-    const outsideMotion = shadows.filter((s) => !s.startsWith("./motion.css"));
-    expect(outsideMotion).toEqual(["./index.css: box-shadow: var(--shadow-lift);"]);
+    expect(shadows).toEqual([]);
   });
 });

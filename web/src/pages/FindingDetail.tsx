@@ -19,7 +19,7 @@ import {
   StatusChip,
 } from "../components/ui";
 import { formatDate, pretty, scoreSentence } from "../format";
-import { LANE_BACKGROUND, laneOf, shortResource } from "../lanes";
+import { LANE_BACKGROUND, laneOf, resourceLabel } from "../lanes";
 import { useRefreshWhenScanEnds } from "../ScanContext";
 import { maskAccountIds } from "../mask";
 import { useAsync } from "../useAsync";
@@ -71,7 +71,7 @@ export function FindingDetail() {
                   className="max-w-full truncate rounded-chip border-2 border-ink px-3 py-1 font-mono text-label"
                   title={finding.resource_id}
                 >
-                  {shortResource(finding.resource_id)}
+                  {resourceLabel(finding)}
                 </span>
                 <SeverityChip severity={finding.severity} />
                 <FindingFlags finding={finding} />
