@@ -315,6 +315,7 @@ def test_cfn_lint_is_run_through_this_interpreter_with_an_argument_list(monkeypa
     assert not kwargs.get("shell")
 
 
+@pytest.mark.skipif(not cfn_lint_installed(), reason="cfn-lint is not installed")
 def test_the_cfn_lint_runner_is_the_console_script_entry_point():
     # The entry point named by the installed package's own metadata (entry_points.txt).
     points = entry_points(group="console_scripts", name="cfn-lint")
@@ -378,6 +379,7 @@ def test_cfn_lint_that_is_not_installed_raises_with_the_install_command(monkeypa
         check_cloudformation(GOOD_BUCKET)
 
 
+@pytest.mark.skipif(not cfn_lint_installed(), reason="cfn-lint is not installed")
 def test_cfn_lint_is_installed_when_its_runner_imports_and_not_when_it_does_not(monkeypatch):
     monkeypatch.setitem(sys.modules, "cfnlint.runner", object())
     assert validators.cfn_lint_installed() is True
