@@ -4,8 +4,7 @@ The extended checks run [Prowler](https://github.com/prowler-cloud/prowler) afte
 own scan, and import its results. Prowler is a separate program that you install yourself.
 CloudShield does not bundle it. Its findings are labelled "Imported".
 
-This works for the AWS account of this computer only. There is no login yet, so run the app on
-localhost only.
+This works for the AWS account of this computer only. Run the app on localhost only.
 
 ## 1. Install Prowler in its own virtual environment
 

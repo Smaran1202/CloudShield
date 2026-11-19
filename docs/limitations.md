@@ -66,7 +66,7 @@
   its extended checks and their import. The lock lives in the server process only, so the
   command-line import (`python -m cloudshield.imports`) is not covered: do not run it while a
   scan is running. SQLite waits up to 5 seconds for another writer before it fails.
-- There are no accounts or logins yet; every row has `account_id` "local". Run the server only on
+- There are no accounts or logins: every row has `account_id` "local". Run the server only on
   localhost: anyone who can reach the port can start scans with the server's AWS credentials, read
   all findings, upload files and dismiss findings.
 
@@ -112,21 +112,6 @@
   can be detected. See `ai-data.md`.
 - The hourly AI limit is counted in the memory of one server process and starts again when the
   server restarts.
-
-## Login
-
-- The login is a lock for showing the project, not a multi-user system. There is one password for
-  the owner and an optional one for a viewer, with no sign-up, no per-user data, no audit of who
-  did what and no password reset. It is off unless `AUTH_ENABLED=true`. See `docs/auth.md`.
-- Logging out clears the cookie in that browser only. The server keeps no list of sessions, so a
-  copied token stays valid until it ends. Changing `SESSION_SECRET` ends every session.
-- The limit on wrong passwords is kept in the memory of one server process, for each client
-  address. `X-Forwarded-For` is ignored unless `TRUST_FORWARDED_FOR` is true.
-- Over plain HTTP the password and the cookie can be read on the network. Behind HTTPS set
-  `COOKIE_SECURE=true`. A server that holds AWS credentials should still not be exposed to the
-  internet.
-- The cookie is `SameSite=Strict`, so the dashboard and the API must be on the same site: use
-  `localhost` for both, not `127.0.0.1` for one of them.
 
 ## Imported findings (Prowler)
 
@@ -244,8 +229,7 @@
   from `GET /api/resources`.
 - Each import keeps its file's base name, the tool name and version from the file, and its pass
   and fail counts. Imports made before this was added show these as empty.
-- The dashboard runs Prowler only for this computer's account. There is no login yet, so run
-  the app on localhost only.
+- The dashboard runs Prowler only for this computer's account. Run the app on localhost only.
 - The extended checks run after CloudShield's own scan and can never fail it. If Prowler is
   missing, blocked, too slow or its file is rejected, the scan still completes and records the
   reason and a hint. Only the services in `PROWLER_SERVICES` (default s3, ec2, iam) and the
@@ -277,7 +261,7 @@
   pieces and refuses it with 413 when it passes 50 MB, even if no size was declared. Only the base
   name of the file is kept. The import is refused with 409 while another import or a scan is
   running. The file comes from you, so everything in "Imported findings" about reported evidence
-  applies. There is no login yet, so anyone who can reach the API can send a file; run it on
+  applies. Anyone who can reach the API can send a file; run it on
   localhost only.
 - When the operating system blocks Prowler, the dashboard says so and offers the file route. A block
   is recognised from the start error (Windows error 4551, a permission error) or from the words
@@ -288,3 +272,34 @@
   download option may differ from what you see; the window describes the goal and not a menu path.
 - A file is identified by its SHA-256. The same file is refused for the same account id, but a
   file with one extra space is a different file.
+
+## Demo data
+
+- `python -m cloudshield.demo seed --db demo.db` builds a made-up AWS account with moto and runs
+  the real scanner, rules and scoring on it, then a second scan after a simulated fix, then imports
+  a hand-written file. Nothing in it comes from a real account or a real Prowler run. The account
+  id is `123456789012`, the example id that moto uses. The imported file's check ids are ones
+  CloudShield already knows, but its severities, resources and wording are made up, and its tool
+  name says it is a synthetic file.
+- Every scan in a demo database has a data label, and the dashboard shows it as a banner while the
+  newest scan has one. A real scan added to the same database has no label, so the banner then goes
+  away even though the old demo rows are still there. Use a separate database for the demo, and do
+  not press Run scan in it.
+- The command refuses to overwrite a file. `--force` replaces a file only when every scan in it
+  carries the demo label, so it can never replace a real database.
+- Moto is not AWS. The demo shows how CloudShield behaves on a small, made-up account, not how
+  many findings a real account has.
+
+## The numbers command
+
+- `python -m cloudshield.report numbers` reads the database only. It never calls AWS and never
+  writes to the database. Account ids, ARNs and resource names are replaced by aliases
+  (`acct-1`, `bucket-1`, `sg-1`, ...), numbered in sorted order, so the same database gives the same
+  aliases. The alias map is kept in memory and is not written anywhere. Any other 12-digit number
+  in the output is also replaced, because it could be an account id.
+- Lane counts follow the dashboard's rule (`web/src/lanes.ts`). The thresholds are written again in
+  `report/numbers.py`, and a test compares the two files, so they cannot drift apart.
+- Test counts are placeholders for you to fill in. The experiment tables are copied from
+  `experiments/results/` when those files exist.
+- A database made before migration 0009 has no `data_label` column. Run
+  `python -m alembic upgrade head` first.

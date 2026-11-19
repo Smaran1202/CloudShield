@@ -353,6 +353,19 @@ def test_resources_can_be_filtered_by_type(tmp_path):
     assert buckets[0]["attributes"]["versioning"] == "Disabled"
 
 
+def test_a_security_group_finding_carries_the_stored_group_name_and_a_bucket_does_not(tmp_path):
+    client = make_client(tmp_path, scan_returning(result([bucket(), open_group()])))
+    run_scan(client, ["us-east-1", "ap-southeast-2"])
+
+    group_finding = findings_by_rule(client, "CIS-SG-001")[0]
+    bucket_finding = findings_by_rule(client, "CIS-S3-003")[0]
+    detail = client.get(f"/api/findings/{group_finding['finding_id']}").json()
+
+    assert group_finding["resource_name"] == "web"
+    assert detail["resource_name"] == "web"
+    assert bucket_finding["resource_name"] is None
+
+
 def test_finding_detail_includes_the_resource_attributes_as_evidence(tmp_path):
     client = make_client(tmp_path, scan_returning(result([bucket()])))
     run_scan(client)

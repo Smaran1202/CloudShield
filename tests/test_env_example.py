@@ -16,6 +16,19 @@ def test_every_name_in_env_example_is_blank_in_the_file():
             assert line.split("=", 1)[1] == "", line
 
 
+def test_every_setting_is_listed_and_has_a_comment_line_above_it():
+    lines = ENV_EXAMPLE.read_text(encoding="utf-8").splitlines()
+    listed = {line.split("=")[0]: lines[i - 1] for i, line in enumerate(lines) if is_name(line)}
+
+    assert {name.upper() for name in Settings.model_fields} <= set(listed)
+    for name, above in listed.items():
+        assert above.startswith("# "), name
+
+
+def is_name(line: str) -> bool:
+    return "=" in line and not line.startswith("#")
+
+
 def test_a_copy_of_env_example_with_every_value_blank_loads_with_all_defaults(monkeypatch):
     names = names_in_env_example()
     assert "PROWLER_TIMEOUT_SECONDS" in names

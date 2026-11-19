@@ -12,9 +12,6 @@ from fastapi.responses import JSONResponse
 
 from cloudshield.api.jobs import JobLock, scan_with_boto3
 from cloudshield.api.routes import router
-from cloudshield.auth.limits import LoginLimiter
-from cloudshield.auth.routes import check_settings
-from cloudshield.auth.routes import router as auth_router
 from cloudshield.config import Settings, load_env_file
 from cloudshield.db import store
 from cloudshield.db.session import make_engine, make_session_factory
@@ -57,12 +54,8 @@ def create_app(
     if load_env:
         load_env_file()
     settings = Settings()
-    check_settings(settings)
-    # The interactive docs would show every route to anyone, so they are off when the login is on.
-    off = {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="CloudShield", lifespan=lifespan, **(off if settings.auth_enabled else {}))
-    # Credentials are allowed for the one frontend origin only, never for every origin: the session
-    # cookie is sent with a cross-origin request only when the page is at that address.
+    app = FastAPI(title="CloudShield", lifespan=lifespan)
+    # Writes are allowed from the one frontend origin only, never from every origin.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.frontend_origin],
@@ -91,7 +84,6 @@ def create_app(
     app.state.session_factory = make_session_factory(engine)
     app.state.scan_function = scan_function or scan_with_boto3
     app.state.job_lock = JobLock()
-    app.state.limiter = LoginLimiter()
     app.state.ai_limit = HourlyLimit(settings.ai_max_calls_per_hour)
     app.state.gemini_transport = gemini_transport
     app.state.extended_cancel = threading.Event()
@@ -100,7 +92,6 @@ def create_app(
     )
     app.state.extended_status = extended_status or StatusCache(partial(check_runner, settings))
     app.include_router(router)
-    app.include_router(auth_router)
 
     @app.get("/api/health")
     def health() -> dict[str, str]:

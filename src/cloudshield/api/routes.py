@@ -28,7 +28,6 @@ from cloudshield.api.schemas import (
     ScoreBreakdown,
     SuggestedNotApplicable,
 )
-from cloudshield.auth.routes import require_session
 from cloudshield.db import store
 from cloudshield.db.models import (
     ACCOUNT_ID,
@@ -59,7 +58,7 @@ from cloudshield.imports.upload import ImportBusy, import_upload
 from cloudshield.risk.scoring import is_mitigated, score_breakdown
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", dependencies=[Depends(require_session)])
+router = APIRouter(prefix="/api")
 
 
 def get_session(request: Request):
@@ -74,15 +73,21 @@ class View:
     newest_import: int | None
     identities: set[str]
     now: datetime
+    group_names: dict[str, str]
 
 
 def make_view(request: Request, session: Session) -> View:
     identities = own_identities(request.app.state.settings.cloudshield_own_identities)
-    return View(latest_import_id(session, ACCOUNT_ID), identities, store.utcnow())
+    groups = select(ResourceRow.resource_id, ResourceRow.name).where(
+        ResourceRow.account_id == ACCOUNT_ID, ResourceRow.resource_type == "Security Group"
+    )
+    names = {resource_id: name for resource_id, name in session.execute(groups) if name}
+    return View(latest_import_id(session, ACCOUNT_ID), identities, store.utcnow(), names)
 
 
 def finding_out(row: FindingRow, view: View) -> FindingOut:
     out = FindingOut.model_validate(row)
+    out.resource_name = view.group_names.get(row.resource_id)
     out.not_rechecked = (
         row.source == "prowler" and row.status == "OPEN" and row.import_id != view.newest_import
     )

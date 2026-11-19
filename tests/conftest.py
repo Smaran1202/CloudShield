@@ -34,13 +34,6 @@ def clean_environment(monkeypatch):
         "KEEP_RAW_OUTPUT",
         "AWS_PROFILE",
         "AWS_REGION",
-        "AUTH_ENABLED",
-        "OWNER_PASSWORD_HASH",
-        "VIEWER_PASSWORD_HASH",
-        "SESSION_SECRET",
-        "SESSION_HOURS",
-        "COOKIE_SECURE",
-        "TRUST_FORWARDED_FOR",
     ]
     for name in names:
         monkeypatch.delenv(name, raising=False)

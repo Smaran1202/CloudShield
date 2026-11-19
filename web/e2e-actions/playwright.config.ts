@@ -49,7 +49,6 @@ export default defineConfig({
       env: {
         DATABASE_URL: `sqlite:///${db}`,
         FRONTEND_ORIGIN: WEB,
-        AUTH_ENABLED: "false",
       },
     },
     {

@@ -6,9 +6,8 @@ Each check returns an empty string when the patch is valid, or the first problem
 import json
 import os
 import shlex
-import shutil
 import subprocess
-import sysconfig
+import sys
 import tempfile
 from pathlib import Path
 
@@ -161,15 +160,18 @@ def check_json(shape: Shape, data, where: str) -> str:
     return f"{where} has the type {kind}, which this check does not cover"
 
 
-def cfn_lint_command() -> str | None:
-    """The cfn-lint command that pip installs. cfn-lint 1.59.0 has no __main__ module, so
-    `python -m cfnlint` does not work; its only entry point is this console script. It is in the
-    folder where this interpreter keeps its scripts, which is not always on the PATH."""
-    return shutil.which("cfn-lint", path=sysconfig.get_path("scripts")) or shutil.which("cfn-lint")
+# cfn-lint 1.59.0 has no __main__ module, so `python -m cfnlint` does not work. Its console script
+# `cfn-lint` is the entry point cfnlint.runner:main (see the package's entry_points.txt). It is
+# called here through this interpreter, because a policy on some machines blocks the .exe launcher.
+CFN_LINT_RUNNER = "import sys; from cfnlint.runner import main; sys.exit(main())"
 
 
 def cfn_lint_installed() -> bool:
-    return cfn_lint_command() is not None
+    try:
+        import cfnlint.runner  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def check_cloudformation(content: str) -> str:
@@ -177,13 +179,12 @@ def check_cloudformation(content: str) -> str:
     found, and the sum of 2 (an error), 4 (a warning) and 8 (an informational message) for what it
     found. Anything else, such as 1 for a bad configuration, means it could not run. Only an error
     makes the patch invalid."""
-    command = cfn_lint_command()
-    if command is None:
+    if not cfn_lint_installed():
         raise RuntimeError('cfn-lint is not installed: pip install -e ".[experiments]"')
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "template.yaml"
         path.write_text(content, encoding="utf-8")
-        arguments = [command, "--format", "json", str(path)]
+        arguments = [sys.executable, "-c", CFN_LINT_RUNNER, "--format", "json", str(path)]
         done = subprocess.run(arguments, capture_output=True, text=True, timeout=120)
     code = done.returncode
     if code not in CFN_LINT_EXIT_CODES:

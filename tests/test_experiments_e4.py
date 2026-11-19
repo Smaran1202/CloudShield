@@ -2,6 +2,8 @@ import csv
 import json
 import shutil
 import subprocess
+import sys
+from importlib.metadata import entry_points
 
 import pytest
 
@@ -297,19 +299,30 @@ def fake_run(monkeypatch, code: int, stdout: str = "", stderr: str = "") -> list
 
 @pytest.fixture
 def cfn_lint(monkeypatch):
-    monkeypatch.setattr(validators, "cfn_lint_command", lambda: "/tools/cfn-lint")
+    monkeypatch.setattr(validators, "cfn_lint_installed", lambda: True)
 
 
-def test_cfn_lint_is_run_as_its_command_with_an_argument_list(monkeypatch, cfn_lint):
+def test_cfn_lint_is_run_through_this_interpreter_with_an_argument_list(monkeypatch, cfn_lint):
     calls = fake_run(monkeypatch, 0)
 
     check_cloudformation(GOOD_BUCKET)
 
     command, kwargs = calls[0]
-    assert command[:3] == ["/tools/cfn-lint", "--format", "json"]
-    assert command[3].endswith("template.yaml")
-    assert len(command) == 4
+    assert command[:3] == [sys.executable, "-c", validators.CFN_LINT_RUNNER]
+    assert command[3:5] == ["--format", "json"]
+    assert command[5].endswith("template.yaml")
+    assert len(command) == 6
     assert not kwargs.get("shell")
+
+
+def test_the_cfn_lint_runner_is_the_console_script_entry_point():
+    # The entry point named by the installed package's own metadata (entry_points.txt).
+    points = entry_points(group="console_scripts", name="cfn-lint")
+
+    assert [point.value for point in points] == ["cfnlint.runner:main"]
+    assert validators.CFN_LINT_RUNNER == (
+        "import sys; from cfnlint.runner import main; sys.exit(main())"
+    )
 
 
 def test_cfn_lint_passes_a_clean_file(monkeypatch, cfn_lint):
@@ -359,37 +372,17 @@ def test_cfn_lint_output_that_is_not_json_raises(monkeypatch, cfn_lint):
 
 
 def test_cfn_lint_that_is_not_installed_raises_with_the_install_command(monkeypatch):
-    monkeypatch.setattr(validators, "cfn_lint_command", lambda: None)
+    monkeypatch.setattr(validators, "cfn_lint_installed", lambda: False)
 
     with pytest.raises(RuntimeError, match="not installed"):
         check_cloudformation(GOOD_BUCKET)
 
 
-def test_the_cfn_lint_command_is_looked_for_in_the_scripts_folder_first(monkeypatch):
-    seen = []
+def test_cfn_lint_is_installed_when_its_runner_imports_and_not_when_it_does_not(monkeypatch):
+    monkeypatch.setitem(sys.modules, "cfnlint.runner", object())
+    assert validators.cfn_lint_installed() is True
 
-    def which(name, path=None):
-        seen.append(path)
-        return "/scripts/cfn-lint" if path == "/scripts" else "/path/cfn-lint"
-
-    monkeypatch.setattr(validators.sysconfig, "get_path", lambda name: "/scripts")
-    monkeypatch.setattr(validators.shutil, "which", which)
-
-    assert validators.cfn_lint_command() == "/scripts/cfn-lint"
-    assert seen == ["/scripts"]
-
-
-def test_the_cfn_lint_command_falls_back_to_the_path_and_then_to_none(monkeypatch):
-    monkeypatch.setattr(validators.sysconfig, "get_path", lambda name: "/scripts")
-
-    def only_on_the_path(name, path=None):
-        return None if path else "/path/cfn-lint"
-
-    monkeypatch.setattr(validators.shutil, "which", only_on_the_path)
-
-    assert validators.cfn_lint_command() == "/path/cfn-lint"
-    monkeypatch.setattr(validators.shutil, "which", lambda name, path=None: None)
-    assert validators.cfn_lint_command() is None
+    monkeypatch.setitem(sys.modules, "cfnlint.runner", None)
     assert validators.cfn_lint_installed() is False
 
 

@@ -36,6 +36,8 @@ class ScanRow(Base):
     extended_status: Mapped[str] = mapped_column(default="skipped", server_default="skipped")
     extended_message: Mapped[str | None]
     extended_hint: Mapped[str | None]
+    # Set only on demo data (python -m cloudshield.demo). The dashboard shows it as a banner.
+    data_label: Mapped[str | None]
 
 
 class ResourceRow(Base):

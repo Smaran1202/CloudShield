@@ -5,7 +5,6 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
-    Field,
     StringConstraints,
     field_validator,
 )
@@ -64,6 +63,7 @@ class ScanOut(BaseModel):
     extended_status: ExtendedStatus
     extended_message: str | None
     extended_hint: str | None
+    data_label: str | None
 
 
 class ResourceOut(BaseModel):
@@ -123,6 +123,8 @@ class FindingOut(BaseModel):
     rule_id: str
     resource_id: str
     resource_type: str
+    # The stored name of a security group. None for other resources or when no name was stored.
+    resource_name: str | None = None
     title: str
     severity: Severity
     category: str
@@ -320,16 +322,3 @@ class FixOut(BaseModel):
 class FindingDetailOut(FindingOut):
     # The stored state of the resource the finding is about.
     resource: ResourceOut | None = None
-
-
-class LoginIn(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    role: Literal["owner", "viewer"]
-    password: str = Field(min_length=1, max_length=256)
-
-
-class MeOut(BaseModel):
-    # False when the login is not turned on. Then every visitor is the owner.
-    auth_enabled: bool
-    role: Literal["owner", "viewer"]
